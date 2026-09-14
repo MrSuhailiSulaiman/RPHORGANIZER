@@ -6,8 +6,10 @@ import { BookMarked } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Senarai DSKP" },
+  { href: "/", label: "DSKP" },
   { href: "/muat-naik", label: "Muat naik" },
+  { href: "/jadual-waktu", label: "Jadual waktu" },
+  { href: "/rph", label: "Borang RPH" },
   { href: "/panduan", label: "Panduan" },
 ];
 
@@ -26,9 +28,10 @@ export function AppHeader() {
             <span className="ml-2 font-normal text-muted-foreground">DSKP</span>
           </span>
         </Link>
-        <nav className="flex items-center gap-1">
+        <nav className="flex flex-wrap items-center justify-end gap-1">
           {NAV.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}

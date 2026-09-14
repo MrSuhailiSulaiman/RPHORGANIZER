@@ -4,7 +4,8 @@ export default function PanduanPage() {
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Panduan e-RPH DSKP</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sistem ini membaca PDF DSKP KSSM dan menyimpan tiga lapisan kurikulum ke Supabase.
+          Sistem ini membaca PDF DSKP KSSM, menetapkan jadual waktu, dan mengisi borang RPH mengikut
+          sesi PdP.
         </p>
       </div>
 
@@ -45,6 +46,24 @@ export default function PanduanPage() {
             <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code>
           </li>
           <li>Mulakan semula <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run dev</code></li>
+        </ol>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-heading text-lg font-medium">Jadual waktu dan RPH</h2>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          <li>
+            Buka <strong className="text-foreground">Jadual waktu</strong>, muat naik CSV/Excel/PDF yang
+            ada lajur KELAS, HARI, MASA, dan MATA PELAJARAN, kemudian simpan.
+          </li>
+          <li>
+            Setiap slot menjadi sesi PdP. Dari <strong className="text-foreground">Borang RPH</strong>,
+            pilih sesi untuk praisi tarikh, hari, masa, kelas, dan mata pelajaran.
+          </li>
+          <li>
+            Bidang, SK, dan SP diambil daripada DSKP yang telah dimuat naik untuk mata pelajaran yang
+            sama.
+          </li>
         </ol>
       </section>
 

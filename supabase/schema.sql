@@ -240,3 +240,190 @@ create policy "anon padam dskp pdf"
 on storage.objects for delete
 to anon, authenticated
 using (bucket_id = 'dskp-pdf');
+
+-- ---------------------------------------------------------------------------
+-- Jadual waktu dan RPH
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.jadual_waktu (
+  id uuid primary key default gen_random_uuid(),
+  nama_fail text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.sesi_pdp (
+  id uuid primary key default gen_random_uuid(),
+  jadual_id uuid references public.jadual_waktu(id) on delete cascade,
+  kelas text not null,
+  tingkatan text,
+  hari text not null,
+  masa text not null,
+  masa_mula text,
+  masa_tamat text,
+  mata_pelajaran text not null,
+  susunan integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.rph (
+  id uuid primary key default gen_random_uuid(),
+  sesi_id uuid references public.sesi_pdp(id) on delete set null,
+  tarikh date,
+  hari text,
+  masa text,
+  tingkatan text,
+  kelas text,
+  mata_pelajaran text,
+  bidang_kod text,
+  bidang_nama text,
+  sk_kod text,
+  sk_tajuk text,
+  standard_pembelajaran jsonb not null default '[]'::jsonb,
+  objektif jsonb not null default '[]'::jsonb,
+  bbm text,
+  nilai text,
+  aktiviti jsonb not null default '[]'::jsonb,
+  refleksi_peratus integer,
+  refleksi_berjaya boolean,
+  refleksi_catatan text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists sesi_pdp_hari_idx on public.sesi_pdp (hari, susunan);
+create index if not exists rph_tarikh_idx on public.rph (tarikh desc);
+
+alter table public.jadual_waktu enable row level security;
+alter table public.sesi_pdp enable row level security;
+alter table public.rph enable row level security;
+
+drop policy if exists "baca jadual waktu" on public.jadual_waktu;
+create policy "baca jadual waktu" on public.jadual_waktu for select using (true);
+
+drop policy if exists "baca sesi pdp" on public.sesi_pdp;
+create policy "baca sesi pdp" on public.sesi_pdp for select using (true);
+
+drop policy if exists "baca rph" on public.rph;
+create policy "baca rph" on public.rph for select using (true);
+
+create or replace function public.simpan_jadual_waktu(payload jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_jadual_id uuid;
+  v_sesi jsonb;
+  v_idx int := 0;
+begin
+  delete from public.sesi_pdp;
+  delete from public.jadual_waktu;
+
+  insert into public.jadual_waktu (nama_fail)
+  values (nullif(payload->>'nama_fail', ''))
+  returning id into v_jadual_id;
+
+  for v_sesi in select value from jsonb_array_elements(coalesce(payload->'sesi', '[]'::jsonb))
+  loop
+    insert into public.sesi_pdp (
+      jadual_id, kelas, tingkatan, hari, masa, masa_mula, masa_tamat, mata_pelajaran, susunan
+    ) values (
+      v_jadual_id,
+      coalesce(v_sesi->>'kelas', ''),
+      nullif(v_sesi->>'tingkatan', ''),
+      coalesce(v_sesi->>'hari', ''),
+      coalesce(v_sesi->>'masa', ''),
+      nullif(v_sesi->>'masa_mula', ''),
+      nullif(v_sesi->>'masa_tamat', ''),
+      coalesce(v_sesi->>'mata_pelajaran', ''),
+      v_idx
+    );
+    v_idx := v_idx + 1;
+  end loop;
+
+  return v_jadual_id;
+end;
+$$;
+
+create or replace function public.simpan_rph(payload jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_sesi uuid;
+begin
+  v_id := nullif(payload->>'id', '')::uuid;
+  v_sesi := nullif(payload->>'sesi_id', '')::uuid;
+
+  if v_id is null then
+    insert into public.rph (
+      sesi_id, tarikh, hari, masa, tingkatan, kelas, mata_pelajaran,
+      bidang_kod, bidang_nama, sk_kod, sk_tajuk, standard_pembelajaran,
+      objektif, bbm, nilai, aktiviti, refleksi_peratus, refleksi_berjaya, refleksi_catatan
+    ) values (
+      v_sesi,
+      nullif(payload->>'tarikh', '')::date,
+      nullif(payload->>'hari', ''),
+      nullif(payload->>'masa', ''),
+      nullif(payload->>'tingkatan', ''),
+      nullif(payload->>'kelas', ''),
+      nullif(payload->>'mata_pelajaran', ''),
+      nullif(payload->>'bidang_kod', ''),
+      nullif(payload->>'bidang_nama', ''),
+      nullif(payload->>'sk_kod', ''),
+      nullif(payload->>'sk_tajuk', ''),
+      coalesce(payload->'standard_pembelajaran', '[]'::jsonb),
+      coalesce(payload->'objektif', '[]'::jsonb),
+      nullif(payload->>'bbm', ''),
+      nullif(payload->>'nilai', ''),
+      coalesce(payload->'aktiviti', '[]'::jsonb),
+      nullif(payload->>'refleksi_peratus', '')::integer,
+      case
+        when payload->>'refleksi_berjaya' is null then null
+        else (payload->>'refleksi_berjaya')::boolean
+      end,
+      nullif(payload->>'refleksi_catatan', '')
+    ) returning id into v_id;
+  else
+    update public.rph set
+      sesi_id = v_sesi,
+      tarikh = nullif(payload->>'tarikh', '')::date,
+      hari = nullif(payload->>'hari', ''),
+      masa = nullif(payload->>'masa', ''),
+      tingkatan = nullif(payload->>'tingkatan', ''),
+      kelas = nullif(payload->>'kelas', ''),
+      mata_pelajaran = nullif(payload->>'mata_pelajaran', ''),
+      bidang_kod = nullif(payload->>'bidang_kod', ''),
+      bidang_nama = nullif(payload->>'bidang_nama', ''),
+      sk_kod = nullif(payload->>'sk_kod', ''),
+      sk_tajuk = nullif(payload->>'sk_tajuk', ''),
+      standard_pembelajaran = coalesce(payload->'standard_pembelajaran', standard_pembelajaran),
+      objektif = coalesce(payload->'objektif', objektif),
+      bbm = nullif(payload->>'bbm', ''),
+      nilai = nullif(payload->>'nilai', ''),
+      aktiviti = coalesce(payload->'aktiviti', aktiviti),
+      refleksi_peratus = nullif(payload->>'refleksi_peratus', '')::integer,
+      refleksi_berjaya = case
+        when payload->>'refleksi_berjaya' is null then refleksi_berjaya
+        else (payload->>'refleksi_berjaya')::boolean
+      end,
+      refleksi_catatan = nullif(payload->>'refleksi_catatan', ''),
+      updated_at = now()
+    where id = v_id;
+    if not found then
+      raise exception 'RPH tidak dijumpai';
+    end if;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.simpan_jadual_waktu(jsonb) from public;
+grant execute on function public.simpan_jadual_waktu(jsonb) to anon, authenticated, service_role;
+revoke all on function public.simpan_rph(jsonb) from public;
+grant execute on function public.simpan_rph(jsonb) to anon, authenticated, service_role;
