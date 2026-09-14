@@ -22,7 +22,7 @@ Buka [http://localhost:3000](http://localhost:3000), kemudian muat naik PDF DSKP
 
 ## GitHub dan Supabase
 
-- Kod: https://github.com/MrCekodok/e-rph
+- Kod: https://github.com/MrSuhailiSulaiman/RPHORGANIZER
 - Projek Supabase: https://supabase.com/dashboard/project/dtfxxqjdoftcyovvhdte
 - Rujukan projek: `dtfxxqjdoftcyovvhdte` (`supabase/config.toml`)
 
