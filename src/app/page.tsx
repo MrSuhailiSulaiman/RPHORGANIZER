@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { senaraiDokumen } from "@/lib/dskp/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const supabaseSedia = isSupabaseConfigured();
   const dokumen = supabaseSedia ? await senaraiDokumen() : [];

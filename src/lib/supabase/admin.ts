@@ -37,18 +37,21 @@ function fileEnv(): EnvMap {
 }
 
 function envValue(key: string) {
-  const fromFile = fileEnv()[key]?.trim();
-  if (fromFile) return fromFile;
-  const dynamic = process.env[key];
-  return typeof dynamic === "string" ? dynamic.trim() : "";
+  const runtime = process.env[key];
+  if (typeof runtime === "string" && runtime.trim()) return runtime.trim();
+  return fileEnv()[key]?.trim() ?? "";
 }
 
 function supabaseUrl() {
-  return envValue("NEXT_PUBLIC_SUPABASE_URL");
+  return envValue("SUPABASE_URL") || envValue("NEXT_PUBLIC_SUPABASE_URL");
 }
 
 function supabaseKey() {
-  return envValue("SUPABASE_SERVICE_ROLE_KEY") || envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  return (
+    envValue("SUPABASE_SERVICE_ROLE_KEY") ||
+    envValue("SUPABASE_ANON_KEY") ||
+    envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  );
 }
 
 export function isSupabaseConfigured() {
@@ -59,7 +62,7 @@ export function createAdminClient(): SupabaseClient {
   const url = supabaseUrl();
   const key = supabaseKey();
   if (!url || !key) {
-    throw new Error("Supabase belum dikonfigurasi. Isi .env.local.");
+    throw new Error("Supabase belum dikonfigurasi. Isi kunci projek pada Vercel atau .env.local.");
   }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },

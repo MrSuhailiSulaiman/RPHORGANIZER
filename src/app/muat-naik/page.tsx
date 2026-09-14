@@ -1,6 +1,8 @@
 import { UploadDskp } from "@/components/upload-dskp";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+
 export default function MuatNaikPage() {
   return (
     <div className="space-y-6">
