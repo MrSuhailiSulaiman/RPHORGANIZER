@@ -7,6 +7,9 @@
     },
     "src/app/api/rph/generate/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/rph/tahun/route.ts": {
+      "maxDuration": 60
     }
   }
 }

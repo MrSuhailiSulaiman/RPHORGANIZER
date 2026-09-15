@@ -43,15 +43,35 @@ function envValue(key: string) {
 }
 
 function supabaseUrl() {
-  return envValue("SUPABASE_URL") || envValue("NEXT_PUBLIC_SUPABASE_URL");
+  return (
+    process.env.SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    envValue("SUPABASE_URL") ||
+    envValue("NEXT_PUBLIC_SUPABASE_URL")
+  );
+}
+
+function supabaseServiceRoleKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || envValue("SUPABASE_SERVICE_ROLE_KEY");
 }
 
 function supabaseKey() {
   return (
-    envValue("SUPABASE_SERVICE_ROLE_KEY") ||
+    supabaseServiceRoleKey() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
     envValue("SUPABASE_ANON_KEY") ||
     envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY")
   );
+}
+
+export function jwtRole(key = supabaseKey()) {
+  try {
+    const payload = JSON.parse(Buffer.from(key.split(".")[1] ?? "", "base64url").toString());
+    return typeof payload.role === "string" ? payload.role : "";
+  } catch {
+    return "";
+  }
 }
 
 export function isSupabaseConfigured() {
@@ -66,5 +86,6 @@ export function createAdminClient(): SupabaseClient {
   }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${key}` } },
   });
 }

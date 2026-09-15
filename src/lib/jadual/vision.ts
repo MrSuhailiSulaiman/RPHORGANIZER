@@ -1,7 +1,8 @@
 import { generateText, Output } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { geminiApiKey, runtimeEnv } from "@/lib/runtime-env";
 import { sesiDariSlot } from "./parse";
 import type { SesiPdp } from "./types";
 
@@ -41,18 +42,15 @@ Peraturan:
 7. masa_mula dan masa_tamat format HH.MM (contoh 06.40, 13.00, 14.20).`;
 
 export function hasVisionProvider() {
-  return Boolean(
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.OPENAI_API_KEY ||
-      process.env.AI_GATEWAY_API_KEY
-  );
+  return Boolean(geminiApiKey() || runtimeEnv("OPENAI_API_KEY") || runtimeEnv("AI_GATEWAY_API_KEY"));
 }
 
 function modelVision() {
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return google("gemini-2.5-flash");
+  const gemini = geminiApiKey();
+  if (gemini) {
+    return createGoogleGenerativeAI({ apiKey: gemini })("gemini-2.5-flash");
   }
-  if (process.env.OPENAI_API_KEY) {
+  if (runtimeEnv("OPENAI_API_KEY")) {
     return openai("gpt-4o");
   }
   return "google/gemini-2.5-flash";

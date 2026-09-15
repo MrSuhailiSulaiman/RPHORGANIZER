@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { padamSemuaRph } from "@/lib/rph/save";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 async function padam() {
   const bilangan = await padamSemuaRph();

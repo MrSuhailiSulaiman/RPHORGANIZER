@@ -1,6 +1,7 @@
 import { generateText, Output } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
+import { geminiApiKey } from "@/lib/runtime-env";
 import type { KurikulumPilihan } from "./types";
 import { ratakanKurikulum, type UnitKurikulum } from "./tahun";
 
@@ -24,7 +25,7 @@ export type BahanRph = {
 };
 
 export function hasGeminiKey() {
-  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  return Boolean(geminiApiKey());
 }
 
 function bahanAsal(unit: UnitKurikulum): BahanRph {
@@ -65,7 +66,7 @@ export async function janaBahanKurikulum(kurikulum: KurikulumPilihan) {
     const bahagian = ringkas.slice(i, i + saiz);
     try {
       const { output } = await generateText({
-        model: google("gemini-2.5-flash"),
+        model: createGoogleGenerativeAI({ apiKey: geminiApiKey() })("gemini-2.5-flash"),
         output: Output.object({ schema: bahanSchema }),
         prompt: `Anda guru pakar KSSM Malaysia. Tulis kandungan RPH dalam bahasa Melayu standard sekolah.
 

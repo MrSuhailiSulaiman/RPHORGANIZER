@@ -1,16 +1,17 @@
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
+import { geminiApiKey, runtimeEnv } from "@/lib/runtime-env";
 import { parseDskpText } from "./parse";
 import { dskpExtractSchema } from "./schema";
 import type { DskpExtract } from "./types";
 
 function hasGoogleKey() {
-  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  return Boolean(geminiApiKey());
 }
 
 function hasOpenAiKey() {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return Boolean(runtimeEnv("OPENAI_API_KEY"));
 }
 
 export function hasAiProvider() {
@@ -66,7 +67,7 @@ Teks DSKP (bahagian relevan):
 ${params.text.slice(0, 40000)}`;
 
   const model = hasGoogleKey()
-    ? google("gemini-2.5-flash")
+    ? createGoogleGenerativeAI({ apiKey: geminiApiKey() })("gemini-2.5-flash")
     : openai("gpt-4o");
 
   const content =
