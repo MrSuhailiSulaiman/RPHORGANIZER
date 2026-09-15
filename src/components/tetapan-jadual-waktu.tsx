@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CONTOH_CSV, HARI_LIST, pecahKelas } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
+import { cn } from "@/lib/utils";
 
 const HARI_OPTIONS = [...HARI_LIST];
 
@@ -33,6 +34,7 @@ export function TetapanJadualWaktu() {
   const [sedangBaca, setSedangBaca] = useState(false);
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangMuat, setSedangMuat] = useState(true);
+  const [sedangLepas, setSedangLepas] = useState(false);
 
   useEffect(() => {
     let hidup = true;
@@ -125,9 +127,9 @@ export function TetapanJadualWaktu() {
         <CalendarClock className="size-4" />
         <AlertTitle>Jadual menjana sesi PdP</AlertTitle>
         <AlertDescription>
-          Muat naik gambar atau PDF jadual guru seperti Jadual Sidang Pagi. Sistem akan pecahkan setiap slot
-          mengikut <strong>hari</strong>, <strong>masa</strong>, <strong>kelas</strong>, dan{" "}
-          <strong>mata pelajaran</strong>. CSV/Excel dengan lajur yang sama juga diterima.
+          Muat naik <strong>gambar</strong> jadual guru (JPG/PNG). Sistem menganalisis setiap petak dan
+          menjana sesi PdP mengikut <strong>hari</strong>, <strong>masa</strong>, <strong>kelas</strong>,
+          dan <strong>mata pelajaran</strong>. PDF, CSV, atau Excel juga diterima.
         </AlertDescription>
       </Alert>
 
@@ -135,17 +137,37 @@ export function TetapanJadualWaktu() {
         <CardHeader>
           <CardTitle>Muat naik jadual waktu</CardTitle>
           <CardDescription>
-            Gambar JPG/PNG, PDF imbasan, CSV atau Excel. Fail contoh CSV boleh dimuat turun.
+            Ambil gambar jadual guru (JPG, PNG, WEBP). Sistem akan baca grid dan pecahkan kepada sesi
+            PdP. PDF, CSV, atau Excel juga boleh.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center hover:bg-muted/40">
+          <label
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center transition-colors hover:bg-muted/40",
+              sedangLepas && "border-primary bg-muted/50",
+              sedangBaca && "pointer-events-none opacity-70"
+            )}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setSedangLepas(true);
+            }}
+            onDragLeave={() => setSedangLepas(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setSedangLepas(false);
+              const file = event.dataTransfer.files[0];
+              if (file) void bacaFail(file);
+            }}
+          >
             <FileUp className="mb-3 size-8 text-muted-foreground" />
-            <p className="text-sm font-medium">Letak gambar atau fail jadual di sini</p>
-            <p className="mt-1 text-xs text-muted-foreground">JPG · PNG · PDF · CSV · XLSX · maksimum 10 MB</p>
+            <p className="text-sm font-medium">Letak gambar jadual di sini atau pilih fail</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              JPG · PNG · WEBP · HEIC · PDF · CSV · XLSX · maksimum 10 MB
+            </p>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic,.pdf,.csv,.txt,.xlsx,.xls"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.gif,.pdf,.csv,.txt,.xlsx,.xls"
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];

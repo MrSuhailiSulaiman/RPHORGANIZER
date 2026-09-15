@@ -304,14 +304,14 @@ export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
 
   const susunMasa = [...slotMasa].sort((a, b) => a.mula.localeCompare(b.mula));
   const digabung = slots.map((slot) => {
-    const mulaMinit = minitDari(slot.masa_mula) ?? 0;
+    const mulaMinit = minitDari(slot.masa_mula ?? "") ?? 0;
     if (mulaMinit < 13 * 60) return slot;
     const indeks = susunMasa.findIndex(
       (item) => item.mula === slot.masa_mula && item.tamat === slot.masa_tamat
     );
     const seterusnya = indeks >= 0 ? susunMasa[indeks + 1] : undefined;
     if (!seterusnya) return slot;
-    const jurang = (minitDari(seterusnya.mula) ?? 0) - (minitDari(slot.masa_tamat) ?? 0);
+    const jurang = (minitDari(seterusnya.mula) ?? 0) - (minitDari(slot.masa_tamat ?? "") ?? 0);
     if (jurang < 0 || jurang > 10) return slot;
     const terisi = slots.some(
       (lain) => lain !== slot && lain.hari === slot.hari && lain.masa_mula === seterusnya.mula
