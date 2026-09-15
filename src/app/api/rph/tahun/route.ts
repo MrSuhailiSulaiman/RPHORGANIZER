@@ -1,7 +1,9 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
-import { padamSemuaRph } from "@/lib/rph/save";
+import { padamSemuaRph, senaraiRph } from "@/lib/rph/save";
+import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 export const fetchCache = "force-no-store";
@@ -11,6 +13,16 @@ async function padam() {
   const bilangan = await padamSemuaRph();
   return NextResponse.json(
     { bil_rph: bilangan },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+}
+
+export async function GET() {
+  await connection();
+  const { service, role } = supabaseRuntimeConfig();
+  const rph = await senaraiRph();
+  return NextResponse.json(
+    { service_role: service, role, bil_rph: rph.length },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

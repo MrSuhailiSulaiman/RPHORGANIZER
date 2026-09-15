@@ -1,4 +1,5 @@
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "./types";
 
 function asStringArray(value: unknown): string[] {
@@ -240,51 +241,87 @@ export async function padamRphDalamTempoh(mula: string, tamat: string) {
 }
 
 async function senaraiSemuaIdRph() {
-  const supabase = createAdminClient();
+  const { url, key } = supabaseRuntimeConfig();
+  if (!url || !key) return [];
   const ids: string[] = [];
-  const saiz = 1000;
-  for (let dari = 0; dari < 50000; dari += saiz) {
-    const { data, error } = await supabase.from("rph").select("id").range(dari, dari + saiz - 1);
-    if (error) throw skemaRalat(error);
-    const bahagian = (data ?? []).map((row) => String(row.id));
-    ids.push(...bahagian);
-    if (bahagian.length < saiz) break;
+  for (let dari = 0; dari < 50000; dari += 1000) {
+    const res = await fetch(`${url}/rest/v1/rph?select=id&limit=1000&offset=${dari}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (!res.ok) throw skemaRalat({ message: await res.text() });
+    const data = (await res.json()) as { id?: string }[];
+    ids.push(...data.map((row) => String(row.id)));
+    if (data.length < 1000) break;
   }
   return ids;
 }
 
+async function padamId(ids: string[]) {
+  const { url, key } = supabaseRuntimeConfig();
+  if (!url || !key || !ids.length) return 0;
+  const senarai = ids.join(",");
+  const res = await fetch(`${url}/rest/v1/rph?id=in.(${senarai})`, {
+    method: "DELETE",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "return=representation",
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) throw skemaRalat({ message: await res.text() });
+  const data = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(data) ? data.length : 0;
+}
+
 export async function padamSemuaRph() {
-  const supabase = createAdminClient();
-  const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_semua_rph");
-  if (!rpcRalat) {
+  const { url, key } = supabaseRuntimeConfig();
+  if (!url || !key) throw new Error("Supabase belum dikonfigurasi.");
+
+  const rpc = await fetch(`${url}/rest/v1/rpc/padam_semua_rph`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+    cache: "no-store",
+  });
+  if (rpc.ok) {
+    const bil = Number(await rpc.text());
     const bakiRpc = await senaraiSemuaIdRph();
-    if (!bakiRpc.length) return Number(rpcBil ?? 0);
+    if (!bakiRpc.length) return Number.isFinite(bil) ? bil : 0;
   }
 
-  const { data: semua, error: padamSemua } = await supabase
-    .from("rph")
-    .delete()
-    .not("id", "is", null)
-    .select("id");
-  if (!padamSemua) {
-    const bakiPadam = await senaraiSemuaIdRph();
-    if (!bakiPadam.length) return semua?.length ?? 0;
+  const semua = await fetch(`${url}/rest/v1/rph?id=not.is.null`, {
+    method: "DELETE",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "return=representation,count=exact",
+    },
+    cache: "no-store",
+  });
+  if (semua.ok) {
+    const data = (await semua.json().catch(() => [])) as unknown[];
+    const baki = await senaraiSemuaIdRph();
+    if (!baki.length) return Array.isArray(data) ? data.length : 0;
   }
 
-  let bil = semua?.length ?? 0;
+  let bil = 0;
   for (let pusingan = 0; pusingan < 50; pusingan += 1) {
     const ids = await senaraiSemuaIdRph();
     if (!ids.length) return bil;
+    let kaliIni = 0;
     for (let i = 0; i < ids.length; i += 100) {
-      const bahagian = ids.slice(i, i + 100);
-      const { data, error } = await supabase.from("rph").delete().in("id", bahagian).select("id");
-      if (error) throw skemaRalat(error);
-      const kaliIni = data?.length ?? 0;
-      if (!kaliIni) break;
-      bil += kaliIni;
+      const n = await padamId(ids.slice(i, i + 100));
+      if (!n) break;
+      kaliIni += n;
+      bil += n;
     }
-    const baki = await senaraiSemuaIdRph();
-    if (baki.length === ids.length) break;
+    if (!kaliIni) break;
   }
 
   const tinggal = await senaraiSemuaIdRph();
