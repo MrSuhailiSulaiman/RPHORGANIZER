@@ -112,16 +112,12 @@ export function SenaraiRph() {
       return;
     }
     const sah = window.confirm(
-      "Semua RPH dalam 40 minggu dari tarikh mula akan dipadam. Tindakan ini tidak boleh dibatalkan."
+      "Semua RPH yang telah dijana akan dipadam. Tindakan ini tidak boleh dibatalkan."
     );
     if (!sah) return;
     setSedangPadam(true);
     try {
-      const res = await fetch("/api/rph/tahun", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tarikh_mula: tarikhMula }),
-      });
+      const res = await fetch("/api/rph/tahun", { method: "POST" });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
       await muat();

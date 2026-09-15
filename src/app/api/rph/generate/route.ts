@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { janaBahanKurikulum, hasGeminiKey } from "@/lib/rph/generate";
-import { getSemuaKurikulum, padamRphDalamTempoh, simpanRphPukal } from "@/lib/rph/save";
+import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
   BIL_MINGGU_TAHUN,
   isninPadaAtauSelepas,
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     });
 
     const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_TAHUN, "JUMAAT");
-    await padamRphDalamTempoh(tarikhMula, tarikhTamat);
+    await padamSemuaRph();
     const bilangan = await simpanRphPukal(rekod);
 
     return NextResponse.json({

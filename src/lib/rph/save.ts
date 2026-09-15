@@ -10,7 +10,7 @@ function tableMissing(error: { message?: string }) {
 }
 
 function skemaRalat(error: { message?: string }) {
-  if (tableMissing(error) || /function public\.simpan_rph/i.test(error.message ?? "")) {
+  if (tableMissing(error) || /simpan_jadual_waktu|simpan_rph|padam_semua_rph|padam_rph_tahun/i.test(error.message ?? "")) {
     return new Error(
       "Jadual RPH belum wujud dalam Supabase. Jalankan keseluruhan fail supabase/schema.sql dalam SQL Editor."
     );
@@ -221,17 +221,49 @@ export async function padamRphDalamTempoh(mula: string, tamat: string) {
     .gte("tarikh", mula)
     .lte("tarikh", tamat)
     .select("id");
-  if (!error) return data?.length ?? 0;
+  if (!error && (data?.length ?? 0) > 0) return data.length;
 
   const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_rph_tahun", {
     tarikh_mula: mula,
     tarikh_tamat: tamat,
   });
   if (!rpcRalat) return Number(rpcBil ?? 0);
+  if (!error) return data?.length ?? 0;
   if (tableMissing(error) || tableMissing(rpcRalat)) return 0;
-  throw new Error(
-    "RPH tidak dapat dipadam. Jalankan fungsi padam_rph_tahun dalam supabase/schema.sql pada SQL Editor Supabase."
-  );
+  throw skemaRalat(rpcRalat);
+}
+
+export async function padamSemuaRph() {
+  const sediaAda = await senaraiRph();
+  if (!sediaAda.length) return 0;
+  const supabase = createAdminClient();
+
+  const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_semua_rph");
+  if (!rpcRalat) return Number(rpcBil ?? sediaAda.length);
+
+  const { data: semua, error: padamSemua } = await supabase
+    .from("rph")
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000")
+    .select("id");
+  if (!padamSemua && (semua?.length ?? 0) > 0) return semua.length;
+
+  const ids = sediaAda.map((item) => item.id);
+  let bil = 0;
+  for (let i = 0; i < ids.length; i += 50) {
+    const bahagian = ids.slice(i, i + 50);
+    const { data, error } = await supabase.from("rph").delete().in("id", bahagian).select("id");
+    if (error) throw skemaRalat(rpcRalat.message ? rpcRalat : error);
+    bil += data?.length ?? 0;
+  }
+
+  const baki = await senaraiRph();
+  if (baki.length) {
+    throw new Error(
+      "RPH tidak dapat dipadam. Jalankan fungsi padam_semua_rph dalam supabase/schema.sql pada SQL Editor Supabase."
+    );
+  }
+  return bil;
 }
 
 export async function simpanRphPukal(senarai: Record<string, unknown>[]) {

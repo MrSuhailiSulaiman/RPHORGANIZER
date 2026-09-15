@@ -479,3 +479,21 @@ $$;
 
 revoke all on function public.padam_rph_tahun(date, date) from public;
 grant execute on function public.padam_rph_tahun(date, date) to anon, authenticated, service_role;
+
+create or replace function public.padam_semua_rph()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_bil int;
+begin
+  delete from public.rph where id is not null;
+  get diagnostics v_bil = row_count;
+  return v_bil;
+end;
+$$;
+
+revoke all on function public.padam_semua_rph() from public;
+grant execute on function public.padam_semua_rph() to anon, authenticated, service_role;
