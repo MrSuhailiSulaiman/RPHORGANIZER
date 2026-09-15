@@ -27,6 +27,7 @@
 # tesseract
 *.traineddata
 .tesseract-cache/
+/vendor/tessdata/
 
 # debug
 npm-debug.log*

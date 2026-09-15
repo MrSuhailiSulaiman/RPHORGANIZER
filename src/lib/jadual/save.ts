@@ -95,6 +95,59 @@ export async function simpanJadual(namaFail: string, sesi: SesiPdp[]) {
       sesi,
     },
   });
-  if (error) throw skemaRalat(error);
-  return { id: data as string };
+  if (!error) return { id: data as string };
+
+  if (!/DELETE requires a WHERE clause/i.test(error.message ?? "")) {
+    throw skemaRalat(error);
+  }
+
+  const { data: sediaAda, error: bacaRalat } = await supabase
+    .from("jadual_waktu")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (bacaRalat) throw skemaRalat(bacaRalat);
+
+  let jadualId = sediaAda?.id as string | undefined;
+  if (jadualId) {
+    const { error: padamSesi } = await supabase.from("sesi_pdp").delete().eq("jadual_id", jadualId);
+    if (padamSesi) throw skemaRalat(padamSesi);
+    const { error: kemaskini } = await supabase
+      .from("jadual_waktu")
+      .update({ nama_fail: namaFail })
+      .eq("id", jadualId);
+    if (kemaskini) throw skemaRalat(kemaskini);
+  } else {
+    const { data: baru, error: cipta } = await supabase
+      .from("jadual_waktu")
+      .insert({ nama_fail: namaFail })
+      .select("id")
+      .single();
+    if (cipta) throw skemaRalat(cipta);
+    jadualId = baru.id as string;
+  }
+
+  const { error: masukSesi } = await supabase.from("sesi_pdp").insert(
+    sesi.map((item, index) => ({
+      jadual_id: jadualId,
+      kelas: item.kelas,
+      tingkatan: item.tingkatan || null,
+      hari: item.hari,
+      masa: item.masa,
+      masa_mula: item.masa_mula || null,
+      masa_tamat: item.masa_tamat || null,
+      mata_pelajaran: item.mata_pelajaran,
+      susunan: index,
+    }))
+  );
+  if (masukSesi) {
+    if (/row-level security|permission denied|RLS/i.test(masukSesi.message ?? "")) {
+      throw new Error(
+        "Jadual tidak dapat disimpan. Jalankan fungsi simpan_jadual_waktu yang dikemas kini dalam supabase/schema.sql pada SQL Editor Supabase."
+      );
+    }
+    throw skemaRalat(masukSesi);
+  }
+  return { id: jadualId };
 }

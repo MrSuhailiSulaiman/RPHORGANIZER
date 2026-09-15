@@ -44,8 +44,7 @@ export function hasVisionProvider() {
   return Boolean(
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
       process.env.OPENAI_API_KEY ||
-      process.env.AI_GATEWAY_API_KEY ||
-      process.env.VERCEL_OIDC_TOKEN
+      process.env.AI_GATEWAY_API_KEY
   );
 }
 

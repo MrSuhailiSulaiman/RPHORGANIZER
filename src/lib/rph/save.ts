@@ -157,3 +157,101 @@ export async function getKurikulum(
     bidang,
   };
 }
+
+export async function getSemuaKurikulum(): Promise<KurikulumPilihan[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("dokumen_dskp")
+    .select(
+      `
+      id,
+      mata_pelajaran,
+      tingkatan,
+      bidang_pembelajaran (
+        kod,
+        nama,
+        susunan,
+        standard_kandungan (
+          kod,
+          tajuk,
+          susunan,
+          standard_pembelajaran (
+            kod,
+            pernyataan,
+            susunan
+          )
+        )
+      )
+    `
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((dokumen) => {
+    const bidang = [...(dokumen.bidang_pembelajaran ?? [])]
+      .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+      .map((item) => ({
+        kod: item.kod,
+        nama: item.nama,
+        standard_kandungan: [...(item.standard_kandungan ?? [])]
+          .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+          .map((sk) => ({
+            kod: sk.kod,
+            tajuk: sk.tajuk,
+            standard_pembelajaran: [...(sk.standard_pembelajaran ?? [])]
+              .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+              .map((sp) => ({ kod: sp.kod, pernyataan: sp.pernyataan })),
+          })),
+      }));
+    return {
+      dokumen_id: dokumen.id,
+      mata_pelajaran: dokumen.mata_pelajaran ?? "",
+      tingkatan: dokumen.tingkatan,
+      bidang,
+    };
+  });
+}
+
+export async function padamRphDalamTempoh(mula: string, tamat: string) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("rph")
+    .delete()
+    .gte("tarikh", mula)
+    .lte("tarikh", tamat)
+    .select("id");
+  if (!error) return data?.length ?? 0;
+
+  const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_rph_tahun", {
+    tarikh_mula: mula,
+    tarikh_tamat: tamat,
+  });
+  if (!rpcRalat) return Number(rpcBil ?? 0);
+  if (tableMissing(error) || tableMissing(rpcRalat)) return 0;
+  throw new Error(
+    "RPH tidak dapat dipadam. Jalankan fungsi padam_rph_tahun dalam supabase/schema.sql pada SQL Editor Supabase."
+  );
+}
+
+export async function simpanRphPukal(senarai: Record<string, unknown>[]) {
+  if (!senarai.length) return 0;
+  const supabase = createAdminClient();
+  const { error } = await supabase.rpc("simpan_rph_pukal", { senarai });
+  if (!error) return senarai.length;
+
+  const saiz = 8;
+  let bil = 0;
+  for (let i = 0; i < senarai.length; i += saiz) {
+    const bahagian = senarai.slice(i, i + saiz);
+    const hasil = await Promise.allSettled(bahagian.map((item) => simpanRph(item)));
+    for (const item of hasil) {
+      if (item.status === "fulfilled") bil += 1;
+      else if (i === 0 && item.status === "rejected") {
+        const sebab = item.reason instanceof Error ? item.reason : skemaRalat({ message: String(item.reason) });
+        throw sebab;
+      }
+    }
+  }
+  return bil;
+}

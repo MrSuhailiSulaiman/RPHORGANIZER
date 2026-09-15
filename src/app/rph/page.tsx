@@ -12,7 +12,7 @@ export default function RphPage() {
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Borang RPH</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pilih sesi PdP daripada jadual waktu, kemudian isi rancangan pengajaran harian.
+            Jana RPH setahun daripada jadual dan DSKP, atau isi borang satu sesi.
           </p>
         </div>
         <div className="flex gap-2">
@@ -22,7 +22,7 @@ export default function RphPage() {
               Tetapan jadual
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
         </div>

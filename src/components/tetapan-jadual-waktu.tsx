@@ -35,6 +35,7 @@ export function TetapanJadualWaktu() {
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangLepas, setSedangLepas] = useState(false);
+  const [ralatBaca, setRalatBaca] = useState("");
 
   useEffect(() => {
     let hidup = true;
@@ -64,18 +65,47 @@ export function TetapanJadualWaktu() {
 
   async function bacaFail(file: File) {
     setSedangBaca(true);
+    setRalatBaca("");
+    const kawalan = new AbortController();
+    const timer = window.setTimeout(() => kawalan.abort(), 80000);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/jadual/analyze", { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal membaca fail.");
-      setSesi(json.sesi ?? []);
+      const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+      if (heic) {
+        throw new Error("Gambar iPhone (HEIC) tidak boleh dibaca. Simpan/kongsi sebagai JPG atau PNG.");
+      }
+
+      const ialahGambar =
+        file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+
+      let hasil: SesiPdp[] = [];
+      if (ialahGambar) {
+        const { analyzeJadualOcrPelayar } = await import("@/lib/jadual/ocr-browser");
+        hasil = await analyzeJadualOcrPelayar(file);
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/jadual/analyze", { method: "POST", body: form, signal: kawalan.signal });
+        const json = (await res.json().catch(() => ({}))) as { ralat?: string; sesi?: SesiPdp[] };
+        if (!res.ok) throw new Error(json.ralat ?? "Gagal membaca fail.");
+        hasil = json.sesi ?? [];
+      }
+      if (!hasil.length) {
+        throw new Error("Tiada sesi PdP dijumpai dalam gambar. Pastikan jadual hari dan kelas nampak jelas.");
+      }
+      setSesi(hasil);
       setNamaFail(file.name);
-      toast.success(`${json.sesi.length} sesi PdP dijana daripada jadual.`);
+      toast.success(`${hasil.length} sesi PdP dijana daripada jadual.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal membaca fail.");
+      const mesej =
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Bacaan jadual terlalu lama. Cuba gambar JPG yang lebih kecil dan jelas."
+          : error instanceof Error
+            ? error.message
+            : "Gagal membaca fail.";
+      setRalatBaca(mesej);
+      toast.error(mesej);
     } finally {
+      window.clearTimeout(timer);
       setSedangBaca(false);
     }
   }
@@ -175,6 +205,11 @@ export function TetapanJadualWaktu() {
               }}
             />
           </label>
+          {ralatBaca ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {ralatBaca}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"

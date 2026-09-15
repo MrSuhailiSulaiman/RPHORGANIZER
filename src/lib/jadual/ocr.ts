@@ -1,329 +1,71 @@
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createWorker, PSM } from "tesseract.js";
-import { lengkapkanSesi, normaliseHari, sesiDariSlot, type SlotJadual } from "./parse";
+import { perkataanDariBlok, perkataanDariTsv, sesiLengkapDariOcr } from "./ocr-grid";
 import type { SesiPdp } from "./types";
 
-type Perkataan = {
-  text: string;
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  xc: number;
-  yc: number;
-};
+export { sesiDariOcr } from "./ocr-grid";
 
-const SLOT_SIDANG_PAGI: [string, string][] = [
-  ["06.30", "06.40"],
-  ["06.40", "07.20"],
-  ["07.20", "08.00"],
-  ["08.00", "08.40"],
-  ["08.40", "09.20"],
-  ["09.00", "09.40"],
-  ["09.40", "10.20"],
-  ["10.20", "11.00"],
-  ["11.00", "11.40"],
-  ["11.40", "12.20"],
-  ["12.20", "13.00"],
-  ["13.00", "13.40"],
-  ["13.45", "14.20"],
-  ["14.20", "15.00"],
-];
-
-function xc(word: { x0: number; x1: number }) {
-  return (word.x0 + word.x1) / 2;
-}
-
-function klusterNilai(nilai: number[], jurang: number) {
-  const susun = [...nilai].sort((a, b) => a - b);
-  const kumpulan: number[][] = [];
-  for (const item of susun) {
-    const terakhir = kumpulan[kumpulan.length - 1];
-    if (!terakhir || item - terakhir[terakhir.length - 1] > jurang) {
-      kumpulan.push([item]);
-    } else {
-      terakhir.push(item);
-    }
+function pilihanPekerjaTesseract() {
+  const tessdata = path.join(process.cwd(), "vendor", "tessdata", "eng.traineddata");
+  const tessdataAkar = path.join(process.cwd(), "eng.traineddata");
+  const sumber = existsSync(tessdata) ? tessdata : existsSync(tessdataAkar) ? tessdataAkar : "";
+  if (!sumber) {
+    throw new Error("Enjin OCR tidak lengkap di pelayan (data bahasa).");
   }
-  return kumpulan.map((senarai) => senarai.reduce((a, b) => a + b, 0) / senarai.length);
+  const cachePath = path.join(tmpdir(), "e-rph-tesseract");
+  mkdirSync(cachePath, { recursive: true });
+  const cacheFail = path.join(cachePath, "eng.traineddata");
+  if (!existsSync(cacheFail)) copyFileSync(sumber, cacheFail);
+  return {
+    cachePath,
+    langPath: path.dirname(sumber),
+    gzip: false,
+    workerBlobURL: false as const,
+    cacheMethod: "write" as const,
+  };
 }
 
-function nampakNomborSlot(text: string) {
-  return /^(1[0-2]|[0-9])$/.test(text.trim());
-}
-
-function minitDari(value: string) {
-  const match = value.match(/(\d{1,2})[.:](\d{2})/);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function slotSah(mula: string, tamat: string) {
-  const a = minitDari(mula);
-  const b = minitDari(tamat);
-  if (a == null || b == null) return false;
-  const lama = b - a;
-  return a >= 6 * 60 && lama >= 5 && lama <= 90;
-}
-
-function parseJamOcr(text: string, rujukan?: string): string | null {
-  const digit = text.replace(/\D/g, "");
-  if (digit.length === 4) {
-    const jam = Number(digit.slice(0, 2));
-    const minit = Number(digit.slice(2));
-    if (jam >= 6 && jam <= 23 && minit <= 59) {
-      return `${String(jam).padStart(2, "0")}.${String(minit).padStart(2, "0")}`;
-    }
+async function denganHadMasa<T>(janji: Promise<T>, ms: number, mesej: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      janji,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(mesej)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  if (digit.length === 3) {
-    const jam = Number(digit[0]);
-    const minit = Number(digit.slice(1));
-    if (jam >= 6 && jam <= 9 && minit <= 59) {
-      return `${String(jam).padStart(2, "0")}.${String(minit).padStart(2, "0")}`;
-    }
-    if (digit[0] === "1" && minit <= 59) {
-      if (digit.slice(1) === "20") return "12.20";
-      if (digit.slice(1) === "40") return "11.40";
-      if (rujukan?.startsWith("11")) return `11.${digit.slice(1)}`;
-      if (rujukan?.startsWith("12")) return `12.${digit.slice(1)}`;
-    }
-  }
-  return null;
 }
 
-function normaliseKelasOcr(raw: string): string | null {
-  let token = raw.replace(/[^a-z0-9]/gi, "").toUpperCase();
-  if (token.length < 3 || token.length > 5) return null;
-  token = token.replace(/^A(?=[U0-9])/, "4").replace(/^S(?=U)/, "5");
-  const namum = token.match(/^([1-6])?(UTM|USM|UT|US|UM)$/);
-  if (!namum) return null;
-  const kod =
-    namum[2] === "US" || namum[2] === "UM"
-      ? namum[2] === "US"
-        ? "USM"
-        : "UTM"
-      : namum[2] === "UT"
-        ? "UTM"
-        : namum[2];
-  if (!namum[1]) return kod;
-  return `${namum[1]} ${kod}`;
-}
-
-function nampakAsk(text: string) {
-  const s = text.toLowerCase().replace(/[^a-z]/g, "");
-  return s === "ask" || s.includes("asas");
-}
-
-function nampakScKom(text: string) {
-  const s = text.toLowerCase().replace(/[^a-z]/g, "");
-  if (!s || s.length > 8) return false;
-  return (
-    s.includes("sc") ||
-    s.includes("kom") ||
-    s === "snow" ||
-    s === "crow" ||
-    s === "scrou" ||
-    s === "scuou" ||
-    s === "scvou"
+export async function analyzeJadualOcr(bytes: Uint8Array): Promise<SesiPdp[]> {
+  const worker = await denganHadMasa(
+    createWorker("eng", 1, pilihanPekerjaTesseract()),
+    20000,
+    "Enjin OCR pelayan tidak tersedia. Cuba muat naik semula daripada pelayar."
   );
-}
-
-function kelasRingkasan(words: Perkataan[], yMin: number) {
-  const bawah = words.filter((word) => word.yc > yMin);
-  const hasil = new Map<string, string>();
-  const baris = klusterNilai(
-    bawah.map((word) => word.yc),
-    10
-  );
-  for (const y of baris) {
-    const token = bawah
-      .filter((word) => Math.abs(word.yc - y) <= 8)
-      .sort((a, b) => a.x0 - b.x0)
-      .map((word) => word.text)
-      .join(" ");
-    const kelas = token.match(/\b([1-6])\s*(USM|UTM)\b/i) ?? token.match(/\b([1-6])(USM|UTM)\b/i);
-    if (!kelas) continue;
-    const namaKelas = `${kelas[1]} ${kelas[2].toUpperCase()}`;
-    const mata = /asas|\bsas\b/i.test(token)
-      ? "ASAS SAINS KOMPUTER"
-      : /sains|komputer/i.test(token)
-        ? "SAINS KOMPUTER"
-        : "";
-    if (mata) hasil.set(namaKelas, mata);
-  }
-  return hasil;
-}
-
-function lengkapkanKelas(token: string, diletak: string[], ringkasan: string[]) {
-  if (/^[1-6]\s/.test(token)) return token;
-  const calon = ringkasan.filter((item) => item.endsWith(` ${token}`) || item.split(/\s+/).pop() === token);
-  if (!calon.length) return token;
-  const kira = (nama: string) => diletak.filter((item) => item === nama).length;
-  return [...calon].sort((a, b) => kira(a) - kira(b))[0];
-}
-
-function mataUntukKelas(kelas: string, ringkasan: Map<string, string>, petunjuk?: string) {
-  if (petunjuk === "ASK" || kelas.startsWith("3 ")) return "ASAS SAINS KOMPUTER";
-  if (petunjuk === "SC") return "SAINS KOMPUTER";
-  return ringkasan.get(kelas) ?? "SAINS KOMPUTER";
-}
-
-export async function ocrPerkataan(bytes: Uint8Array): Promise<Perkataan[]> {
-  const worker = await createWorker("eng", undefined, {
-    cachePath: path.join(tmpdir(), "e-rph-tesseract"),
-  });
   try {
     await worker.setParameters({
       tessedit_pageseg_mode: PSM.SPARSE_TEXT,
       preserve_interword_spaces: "1",
     });
-    const result = await worker.recognize(Buffer.from(bytes), {}, { text: true, blocks: true });
-    const words: Perkataan[] = [];
-    for (const block of result.data.blocks ?? []) {
-      for (const para of block.paragraphs ?? []) {
-        for (const line of para.lines ?? []) {
-          for (const word of line.words ?? []) {
-            const text = word.text.replace(/\s+/g, "").trim();
-            if (!text) continue;
-            words.push({
-              text,
-              x0: word.bbox.x0,
-              y0: word.bbox.y0,
-              x1: word.bbox.x1,
-              y1: word.bbox.y1,
-              xc: xc(word.bbox),
-              yc: (word.bbox.y0 + word.bbox.y1) / 2,
-            });
-          }
-        }
-      }
+    const result = await denganHadMasa(
+      worker.recognize(Buffer.from(bytes), {}, { text: true, blocks: true, tsv: true }),
+      25000,
+      "Bacaan gambar terlalu lama. Cuba gambar yang lebih terang dan tidak terlalu besar."
+    );
+    const dariBlok = perkataanDariBlok(result.data.blocks);
+    const words = dariBlok.length ? dariBlok : perkataanDariTsv(String(result.data.tsv ?? ""));
+    if (!words.length) {
+      throw new Error(
+        "Gambar jadual tidak dapat dibaca. Cuba JPG/PNG yang terang, atau tukar HEIC kepada JPG."
+      );
     }
-    return words;
+    return sesiLengkapDariOcr(words);
   } finally {
-    await worker.terminate();
+    await worker.terminate().catch(() => undefined);
   }
-}
-
-export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
-  const hariWords = words
-    .map((word) => ({ word, hari: normaliseHari(word.text) }))
-    .filter((item): item is { word: Perkataan; hari: string } => Boolean(item.hari));
-  if (hariWords.length < 3) return [];
-
-  const yHari = hariWords.map((item) => item.word.yc);
-  const yHariMin = Math.min(...yHari);
-  const yHariMax = Math.max(...yHari);
-  const xHariMax = Math.max(...hariWords.map((item) => item.word.x1));
-
-  const header = words.filter((word) => word.yc < yHariMin - 4 && word.yc > yHariMin - 90);
-  const lajurX = klusterNilai(
-    header
-      .filter((word) => {
-        const digit = word.text.replace(/\D/g, "");
-        return digit.length >= 3 || Boolean(parseJamOcr(word.text));
-      })
-      .map((word) => word.xc),
-    35
-  ).filter((x) => x > xHariMax + 10);
-
-  if (lajurX.length < 4) return [];
-
-  const slotMasa = lajurX.map((x, index) => {
-    const fallback = SLOT_SIDANG_PAGI[index] ?? SLOT_SIDANG_PAGI[SLOT_SIDANG_PAGI.length - 1];
-    const hampir = header
-      .filter((word) => Math.abs(word.xc - x) < 22 && !nampakNomborSlot(word.text))
-      .sort((a, b) => a.yc - b.yc);
-    const jam = hampir
-      .map((word) => parseJamOcr(word.text))
-      .filter((item): item is string => Boolean(item));
-    if (jam.length >= 2 && slotSah(jam[0], jam[jam.length - 1])) {
-      return { x, mula: jam[0], tamat: jam[jam.length - 1] };
-    }
-    if (hampir.length >= 2) {
-      const atas = parseJamOcr(hampir[0].text);
-      const bawah = parseJamOcr(hampir[hampir.length - 1].text, atas ?? undefined);
-      if (atas && bawah && slotSah(atas, bawah)) {
-        return { x, mula: atas, tamat: bawah };
-      }
-    }
-    if (jam.length === 1 && slotSah(jam[0], fallback[1])) {
-      return { x, mula: jam[0], tamat: fallback[1] };
-    }
-    if (jam.length === 2 && slotSah(jam[0], jam[1])) {
-      return { x, mula: jam[0], tamat: jam[1] };
-    }
-    return { x, mula: fallback[0], tamat: fallback[1] };
-  });
-
-  const ringkasan = kelasRingkasan(words, yHariMax + 40);
-  const namaRingkasan = [...ringkasan.keys()];
-  const diletak: string[] = [];
-  const slots: SlotJadual[] = [];
-
-  const kelasWords = words.filter((word) => {
-    if (word.yc < yHariMin - 8 || word.yc > yHariMax + 28) return false;
-    if (word.xc < xHariMax + 20) return false;
-    return Boolean(normaliseKelasOcr(word.text));
-  });
-
-  for (const word of kelasWords) {
-    const hariItem = [...hariWords].sort(
-      (a, b) => Math.abs(a.word.yc - word.yc) - Math.abs(b.word.yc - word.yc)
-    )[0];
-    if (!hariItem || Math.abs(hariItem.word.yc - word.yc) > 18) continue;
-
-    const lajur = [...slotMasa].sort((a, b) => Math.abs(a.x - word.xc) - Math.abs(b.x - word.xc))[0];
-    if (!lajur || Math.abs(lajur.x - word.xc) > 55) continue;
-
-    const mentah = normaliseKelasOcr(word.text);
-    if (!mentah) continue;
-    const kelas = lengkapkanKelas(mentah, diletak, namaRingkasan);
-    diletak.push(kelas);
-
-    const bawah = words.filter(
-      (item) =>
-        item.yc > word.y1 - 2 &&
-        item.yc < word.y1 + 28 &&
-        Math.abs(item.xc - word.xc) < 45
-    );
-    const petunjuk = bawah.some((item) => nampakAsk(item.text))
-      ? "ASK"
-      : bawah.some((item) => nampakScKom(item.text))
-        ? "SC"
-        : undefined;
-
-    slots.push({
-      hari: hariItem.hari,
-      masa_mula: lajur.mula,
-      masa_tamat: lajur.tamat,
-      kelas,
-      mata_pelajaran: mataUntukKelas(kelas, ringkasan, petunjuk),
-    });
-  }
-
-  const susunMasa = [...slotMasa].sort((a, b) => a.mula.localeCompare(b.mula));
-  const digabung = slots.map((slot) => {
-    const mulaMinit = minitDari(slot.masa_mula ?? "") ?? 0;
-    if (mulaMinit < 13 * 60) return slot;
-    const indeks = susunMasa.findIndex(
-      (item) => item.mula === slot.masa_mula && item.tamat === slot.masa_tamat
-    );
-    const seterusnya = indeks >= 0 ? susunMasa[indeks + 1] : undefined;
-    if (!seterusnya) return slot;
-    const jurang = (minitDari(seterusnya.mula) ?? 0) - (minitDari(slot.masa_tamat ?? "") ?? 0);
-    if (jurang < 0 || jurang > 10) return slot;
-    const terisi = slots.some(
-      (lain) => lain !== slot && lain.hari === slot.hari && lain.masa_mula === seterusnya.mula
-    );
-    if (terisi) return slot;
-    return { ...slot, masa_tamat: seterusnya.tamat };
-  });
-
-  return sesiDariSlot(digabung);
-}
-
-export async function analyzeJadualOcr(bytes: Uint8Array): Promise<SesiPdp[]> {
-  const words = await ocrPerkataan(bytes);
-  return lengkapkanSesi(sesiDariOcr(words));
 }

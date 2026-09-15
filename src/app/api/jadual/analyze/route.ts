@@ -71,16 +71,37 @@ export async function POST(request: Request) {
         });
       }
     } else if (ialahGambarJadual(file.name, file.type)) {
-      sesi = await analyzeJadualOcr(bytes);
+      const mime = mediaTypeJadual(file.name, file.type);
+      if (mime === "image/heic" || mime === "image/heif") {
+        return NextResponse.json(
+          {
+            ralat:
+              "Gambar iPhone (HEIC) tidak boleh dibaca. Buka gambar, kemudian simpan/kongsi sebagai JPG atau PNG.",
+          },
+          { status: 422 }
+        );
+      }
+      try {
+        sesi = await analyzeJadualOcr(bytes);
+      } catch (error) {
+        const mesej = error instanceof Error ? error.message : "Gagal membaca gambar jadual.";
+        if (!hasVisionProvider()) {
+          return NextResponse.json({ ralat: mesej }, { status: 422 });
+        }
+        try {
+          const ai = await analyzeJadualVision({ bytes, mediaType: mime });
+          if (ai.length) sesi = ai;
+          else return NextResponse.json({ ralat: mesej }, { status: 422 });
+        } catch {
+          return NextResponse.json({ ralat: mesej }, { status: 422 });
+        }
+      }
       if (sesi.length < 3 && hasVisionProvider()) {
         try {
-          const ai = await analyzeJadualVision({
-            bytes,
-            mediaType: mediaTypeJadual(file.name, file.type),
-          });
+          const ai = await analyzeJadualVision({ bytes, mediaType: mime });
           if (ai.length > sesi.length) sesi = ai;
-        } catch (error) {
-          if (!sesi.length) throw error;
+        } catch {
+          // kekalkan hasil OCR
         }
       }
       if (!sesi.length) {
