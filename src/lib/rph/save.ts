@@ -1,4 +1,4 @@
-import { createAdminClient, isSupabaseConfigured, jwtRole } from "@/lib/supabase/admin";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "./types";
 
 function asStringArray(value: unknown): string[] {
@@ -239,16 +239,14 @@ export async function padamRphDalamTempoh(mula: string, tamat: string) {
   throw skemaRalat(rpcRalat);
 }
 
-async function senaraiIdRph() {
+async function senaraiSemuaIdRph() {
   const supabase = createAdminClient();
   const ids: string[] = [];
   const saiz = 1000;
-  for (let dari = 0; dari < 20000; dari += saiz) {
-    const { data, error } = await supabase.from("rph").select("id, mata_pelajaran").range(dari, dari + saiz - 1);
+  for (let dari = 0; dari < 50000; dari += saiz) {
+    const { data, error } = await supabase.from("rph").select("id").range(dari, dari + saiz - 1);
     if (error) throw skemaRalat(error);
-    const bahagian = (data ?? [])
-      .filter((row) => String(row.mata_pelajaran ?? "") !== RPH_PADAM)
-      .map((row) => String(row.id));
+    const bahagian = (data ?? []).map((row) => String(row.id));
     ids.push(...bahagian);
     if (bahagian.length < saiz) break;
   }
@@ -259,7 +257,7 @@ export async function padamSemuaRph() {
   const supabase = createAdminClient();
   const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_semua_rph");
   if (!rpcRalat) {
-    const bakiRpc = await senaraiIdRph();
+    const bakiRpc = await senaraiSemuaIdRph();
     if (!bakiRpc.length) return Number(rpcBil ?? 0);
   }
 
@@ -268,50 +266,30 @@ export async function padamSemuaRph() {
     .delete()
     .not("id", "is", null)
     .select("id");
-  if (!padamSemua && (semua?.length ?? 0) > 0) {
-    const bakiPadam = await senaraiIdRph();
-    if (!bakiPadam.length) return semua.length;
+  if (!padamSemua) {
+    const bakiPadam = await senaraiSemuaIdRph();
+    if (!bakiPadam.length) return semua?.length ?? 0;
   }
 
   let bil = semua?.length ?? 0;
-  for (let pusingan = 0; pusingan < 30; pusingan += 1) {
-    const ids = await senaraiIdRph();
+  for (let pusingan = 0; pusingan < 50; pusingan += 1) {
+    const ids = await senaraiSemuaIdRph();
     if (!ids.length) return bil;
-    for (let i = 0; i < ids.length; i += 50) {
-      const bahagian = ids.slice(i, i + 50);
+    for (let i = 0; i < ids.length; i += 100) {
+      const bahagian = ids.slice(i, i + 100);
       const { data, error } = await supabase.from("rph").delete().in("id", bahagian).select("id");
       if (error) throw skemaRalat(error);
       const kaliIni = data?.length ?? 0;
       if (!kaliIni) break;
       bil += kaliIni;
     }
-    if ((await senaraiIdRph()).length === ids.length) break;
+    const baki = await senaraiSemuaIdRph();
+    if (baki.length === ids.length) break;
   }
 
-  const baki = await senaraiIdRph();
-  if (!baki.length) return bil;
-
-  const saizLembut = 12;
-  for (let i = 0; i < baki.length; i += saizLembut) {
-    const bahagian = baki.slice(i, i + saizLembut);
-    const hasil = await Promise.all(
-      bahagian.map((id) => supabase.rpc("simpan_rph", { payload: { id, mata_pelajaran: RPH_PADAM } }))
-    );
-    for (const item of hasil) {
-      if (item.error) throw skemaRalat(item.error);
-      bil += 1;
-    }
-  }
-
-  const masihAda = await senaraiRph();
-  if (masihAda.length) {
-    const peranan = jwtRole();
-    if (peranan && peranan !== "service_role") {
-      throw new Error(
-        "RPH tidak dapat dipadam kerana pangkalan data menyekat padam. Tambah kunci service_role projek Supabase pada Vercel."
-      );
-    }
-    throw skemaRalat(rpcRalat ?? padamSemua ?? { message: "RPH tidak dapat dipadam." });
+  const tinggal = await senaraiSemuaIdRph();
+  if (tinggal.length) {
+    throw new Error("RPH tidak dapat dipadam daripada pangkalan data. Rekod termasuk id masih wujud.");
   }
   return bil;
 }

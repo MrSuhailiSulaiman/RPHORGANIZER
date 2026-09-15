@@ -88,6 +88,7 @@ export function SenaraiRph() {
     try {
       const res = await fetch("/api/rph/generate", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tarikh_mula: tarikhMula }),
       });
@@ -117,7 +118,7 @@ export function SenaraiRph() {
     if (!sah) return;
     setSedangPadam(true);
     try {
-      const res = await fetch("/api/rph/tahun", { method: "POST" });
+      const res = await fetch("/api/rph/tahun", { method: "POST", cache: "no-store" });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
       await muat();

@@ -50,9 +50,15 @@ export function runtimeEnv(key: string) {
 
 export function geminiApiKey() {
   const key =
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
+    process.env.GEMINI_API_KEY?.trim() ||
+    process.env.GOOGLE_API_KEY?.trim() ||
     runtimeEnv("GOOGLE_GENERATIVE_AI_API_KEY") ||
     runtimeEnv("GEMINI_API_KEY") ||
     runtimeEnv("GOOGLE_API_KEY");
-  if (key) process.env["GOOGLE_GENERATIVE_AI_API_KEY"] = key;
+  if (key) {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = key;
+    process.env["GOOGLE_GENERATIVE_AI_API_KEY"] = key;
+  }
   return key;
 }

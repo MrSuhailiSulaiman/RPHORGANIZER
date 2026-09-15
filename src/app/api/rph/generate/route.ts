@@ -15,25 +15,34 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 function kunciGeminiSedia() {
-  return Boolean(geminiApiKey());
+  return Boolean(
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
+      process.env.GEMINI_API_KEY?.trim() ||
+      geminiApiKey()
+  );
 }
 
 export async function GET() {
   await connection();
-  return NextResponse.json({ gemini: kunciGeminiSedia() });
+  return NextResponse.json(
+    { gemini: kunciGeminiSedia() },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 export async function POST(request: Request) {
   try {
     await connection();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
-    if (!kunciGeminiSedia()) {
-      return NextResponse.json(
-        { ralat: "Kunci Gemini belum ditetapkan. Isi GOOGLE_GENERATIVE_AI_API_KEY." },
-        { status: 422 }
-      );
+    const gemini = kunciGeminiSedia();
+    if (!gemini) {
+      console.error("gemini_key_missing", {
+        google: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
+        gemini: Boolean(process.env.GEMINI_API_KEY),
+      });
     }
 
     const sesi = await senaraiSesi();
