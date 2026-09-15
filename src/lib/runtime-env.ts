@@ -28,6 +28,7 @@ function fileEnv(): EnvMap {
   const cwd = process.cwd();
   const files = [
     join(cwd, ".env.local"),
+    join(cwd, ".env"),
     join(cwd, "e-rph", ".env.local"),
     join(dirname(process.cwd()), "e-rph", ".env.local"),
     "/Users/suhaili/e-rph/.env.local",
@@ -35,24 +36,23 @@ function fileEnv(): EnvMap {
   return files.reduce<EnvMap>((all, file) => ({ ...all, ...parseEnvFile(file) }), {});
 }
 
-function namedEnv(key: string) {
-  const fromProcess = {
-    GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
-  }[key];
-  if (typeof fromProcess === "string" && fromProcess.trim()) return fromProcess.trim();
-  const dynamic = process.env[key];
-  if (typeof dynamic === "string" && dynamic.trim()) return dynamic.trim();
-  return fileEnv()[key]?.trim() ?? "";
+function readEnv(name: string) {
+  const runtime = process.env[name];
+  if (typeof runtime === "string" && runtime.trim()) return runtime.trim();
+  return fileEnv()[name]?.trim() ?? "";
 }
 
 export function runtimeEnv(key: string) {
-  const value = namedEnv(key);
-  if (value && !process.env[key]?.trim()) process.env[key] = value;
+  const value = readEnv(key);
+  if (value) process.env[key] = value;
   return value;
 }
 
 export function geminiApiKey() {
-  return runtimeEnv("GOOGLE_GENERATIVE_AI_API_KEY");
+  const key =
+    runtimeEnv("GOOGLE_GENERATIVE_AI_API_KEY") ||
+    runtimeEnv("GEMINI_API_KEY") ||
+    runtimeEnv("GOOGLE_API_KEY");
+  if (key) process.env["GOOGLE_GENERATIVE_AI_API_KEY"] = key;
+  return key;
 }

@@ -1,6 +1,8 @@
+import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { senaraiSesi } from "@/lib/jadual/save";
-import { janaBahanKurikulum, hasGeminiKey } from "@/lib/rph/generate";
+import { janaBahanKurikulum } from "@/lib/rph/generate";
+import { geminiApiKey } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
   BIL_MINGGU_TAHUN,
@@ -14,10 +16,20 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
+function kunciGeminiSedia() {
+  return Boolean(geminiApiKey());
+}
+
+export async function GET() {
+  await connection();
+  return NextResponse.json({ gemini: kunciGeminiSedia() });
+}
+
 export async function POST(request: Request) {
   try {
+    await connection();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
-    if (!hasGeminiKey()) {
+    if (!kunciGeminiSedia()) {
       return NextResponse.json(
         { ralat: "Kunci Gemini belum ditetapkan. Isi GOOGLE_GENERATIVE_AI_API_KEY." },
         { status: 422 }
