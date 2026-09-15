@@ -32,6 +32,107 @@ const HARI_ALIAS: Record<string, string> = {
 const SKIP_CELL =
   /^(kosong|rehat|rht|assembly|perhimpunan|n\/a|-|—|–|nil|x)?$/i;
 
+const MATA_PENDEK: Record<string, string> = {
+  ask: "ASAS SAINS KOMPUTER",
+  "asas sains komputer": "ASAS SAINS KOMPUTER",
+  "sc kom": "SAINS KOMPUTER",
+  sckom: "SAINS KOMPUTER",
+  "sc komputer": "SAINS KOMPUTER",
+  "sains komputer": "SAINS KOMPUTER",
+  bm: "BAHASA MELAYU",
+  "bahasa melayu": "BAHASA MELAYU",
+  bi: "BAHASA INGGERIS",
+  "bahasa inggeris": "BAHASA INGGERIS",
+  pj: "PENDIDIKAN JASMANI",
+  pjpk: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN",
+  rbt: "REKA BENTUK DAN TEKNOLOGI",
+  pi: "PENDIDIKAN ISLAM",
+  pm: "PENDIDIKAN MORAL",
+  sn: "SAINS",
+  mat: "MATEMATIK",
+  math: "MATEMATIK",
+  matematik: "MATEMATIK",
+  sej: "SEJARAH",
+  geo: "GEOGRAFI",
+  muz: "PENDIDIKAN MUZIK",
+  sv: "SAINS VOKASIONAL",
+};
+
+function kunciMata(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[./_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function kembangkanMataPelajaran(value: string) {
+  const kunci = kunciMata(value);
+  if (!kunci) return "";
+  return MATA_PENDEK[kunci] ?? value.replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+function minitDariMasa(value: string) {
+  const match = value.match(/(\d{1,2})[.:](\d{2})/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function hampirBersambung(tamat: string, mula: string) {
+  const a = minitDariMasa(tamat);
+  const b = minitDariMasa(mula);
+  if (a == null || b == null) return false;
+  const jurang = b - a;
+  return jurang >= 0 && jurang <= 10;
+}
+
+export function cantumSesiBersambung(sesi: SesiPdp[]) {
+  const kumpulan = new Map<string, SesiPdp[]>();
+  for (const item of sesi) {
+    const kunci = [item.hari, item.kelas, item.tingkatan, item.mata_pelajaran]
+      .join("|")
+      .toLowerCase();
+    const senarai = kumpulan.get(kunci) ?? [];
+    senarai.push(item);
+    kumpulan.set(kunci, senarai);
+  }
+
+  const hasil: SesiPdp[] = [];
+  for (const senarai of kumpulan.values()) {
+    senarai.sort((a, b) => a.masa_mula.localeCompare(b.masa_mula) || a.masa_tamat.localeCompare(b.masa_tamat));
+    let semasa = { ...senarai[0] };
+    for (const seterusnya of senarai.slice(1)) {
+      if (hampirBersambung(semasa.masa_tamat, seterusnya.masa_mula)) {
+        semasa = {
+          ...semasa,
+          masa_tamat: seterusnya.masa_tamat,
+          masa: `${semasa.masa_mula} - ${seterusnya.masa_tamat}`,
+        };
+      } else {
+        hasil.push(semasa);
+        semasa = { ...seterusnya };
+      }
+    }
+    hasil.push(semasa);
+  }
+  return hasil;
+}
+
+export function parseSelGuru(raw: string): Pick<SesiPdp, "kelas" | "tingkatan" | "mata_pelajaran"> | null {
+  const text = raw.replace(/\s+/g, " ").trim();
+  if (!text || SKIP_CELL.test(text)) return null;
+  const match = text.match(/^([1-6])\s*([A-Za-z][A-Za-z0-9]*)(?:\s+(.+))?$/);
+  if (!match) return null;
+  const mata = kembangkanMataPelajaran((match[3] ?? "").trim());
+  if (!mata) return null;
+  const pecah = pecahKelas(`${match[1]} ${match[2]}`);
+  return {
+    kelas: pecah.kelas,
+    tingkatan: pecah.tingkatan,
+    mata_pelajaran: mata,
+  };
+}
+
 export function normaliseHari(value: string): string | null {
   const key = value
     .trim()
@@ -116,7 +217,7 @@ function parseBaris(rows: string[][]): SesiPdp[] {
     const kelasRaw = row[cols.kelas]?.trim() ?? "";
     const hari = normaliseHari(row[cols.hari] ?? "");
     const masa = normaliseMasa(row[cols.masa] ?? "");
-    const mata = (row[cols.mata] ?? "").replace(/\s+/g, " ").trim();
+    const mata = kembangkanMataPelajaran((row[cols.mata] ?? "").replace(/\s+/g, " ").trim());
     if (!kelasRaw || !hari || !masa || !mata || SKIP_CELL.test(mata)) continue;
     const pecah = pecahKelas(kelasRaw);
     const tingkatan =
@@ -132,8 +233,57 @@ function parseBaris(rows: string[][]): SesiPdp[] {
       masa: masa.paparan,
       masa_mula: masa.mula,
       masa_tamat: masa.tamat,
-      mata_pelajaran: mata.toUpperCase(),
+      mata_pelajaran: mata,
     });
+  }
+  return hasil.filter(sesiSah);
+}
+
+function parseGridHariBaris(rows: string[][]): SesiPdp[] {
+  let headerIndex = -1;
+  let masaCols: { index: number; masa: NonNullable<ReturnType<typeof normaliseMasa>> }[] = [];
+  for (let i = 0; i < Math.min(rows.length, 12); i += 1) {
+    const found = rows[i]
+      .map((cell, index) => ({ index, masa: normaliseMasa(cell) }))
+      .filter(
+        (item): item is { index: number; masa: NonNullable<ReturnType<typeof normaliseMasa>> } =>
+          Boolean(item.masa)
+      );
+    if (found.length >= 3) {
+      headerIndex = i;
+      masaCols = found;
+      break;
+    }
+  }
+  if (headerIndex < 0) return [];
+
+  const hasil: SesiPdp[] = [];
+  for (const row of rows.slice(headerIndex + 1)) {
+    let hari: string | null = null;
+    let hariIndex = -1;
+    for (let i = 0; i < Math.min(row.length, 3); i += 1) {
+      hari = normaliseHari(row[i] ?? "");
+      if (hari) {
+        hariIndex = i;
+        break;
+      }
+    }
+    if (!hari) continue;
+
+    for (const col of masaCols) {
+      if (col.index === hariIndex) continue;
+      const raw = (row[col.index] ?? "").replace(/\s+/g, " ").trim();
+      if (!raw || SKIP_CELL.test(raw)) continue;
+      const sel = parseSelGuru(raw);
+      if (!sel) continue;
+      hasil.push({
+        ...sel,
+        hari,
+        masa: col.masa.paparan,
+        masa_mula: col.masa.mula,
+        masa_tamat: col.masa.tamat,
+      });
+    }
   }
   return hasil.filter(sesiSah);
 }
@@ -188,11 +338,21 @@ function parseGrid(rows: string[][]): SesiPdp[] {
         masa: masa.paparan,
         masa_mula: masa.mula,
         masa_tamat: masa.tamat,
-        mata_pelajaran: mata.toUpperCase(),
+        mata_pelajaran: kembangkanMataPelajaran(mata),
       });
     }
   }
   return hasil.filter(sesiSah);
+}
+
+export function lengkapkanSesi(sesi: SesiPdp[]) {
+  const mapped = sesi
+    .map((item) => ({
+      ...item,
+      mata_pelajaran: kembangkanMataPelajaran(item.mata_pelajaran),
+    }))
+    .filter(sesiSah);
+  return susunSesi(unik(cantumSesiBersambung(mapped)));
 }
 
 export function parseCsv(text: string): string[][] {
@@ -249,13 +409,57 @@ export function parsePdfJadual(text: string): string[][] {
     .filter((row) => row.length >= 2);
 }
 
+export type SlotJadual = {
+  hari: string;
+  masa?: string;
+  masa_mula?: string;
+  masa_tamat?: string;
+  kelas: string;
+  mata_pelajaran: string;
+};
+
+export function sesiDariSlot(slots: SlotJadual[]): SesiPdp[] {
+  const hasil: SesiPdp[] = [];
+  for (const slot of slots) {
+    const hari = normaliseHari(slot.hari);
+    const masa =
+      normaliseMasa(slot.masa ?? "") ??
+      normaliseMasa(`${slot.masa_mula ?? ""}-${slot.masa_tamat ?? ""}`);
+    if (!hari || !masa) continue;
+    const gabung = `${slot.kelas} ${slot.mata_pelajaran}`.replace(/\s+/g, " ").trim();
+    const sel =
+      parseSelGuru(gabung) ??
+      (() => {
+        const pecah = pecahKelas(slot.kelas);
+        const mata = kembangkanMataPelajaran(slot.mata_pelajaran);
+        if (!pecah.kelas || !mata || SKIP_CELL.test(mata)) return null;
+        return {
+          kelas: pecah.kelas,
+          tingkatan: pecah.tingkatan,
+          mata_pelajaran: mata,
+        };
+      })();
+    if (!sel) continue;
+    hasil.push({
+      ...sel,
+      hari,
+      masa: masa.paparan,
+      masa_mula: masa.mula,
+      masa_tamat: masa.tamat,
+    });
+  }
+  return lengkapkanSesi(hasil);
+}
+
 export function parseJadualMatrix(rows: string[][]): SesiPdp[] {
   const bersih = rows
     .map((row) => row.map((cell) => cell.replace(/\u00a0/g, " ").trim()))
     .filter((row) => row.some((cell) => cell));
   const baris = parseBaris(bersih);
-  if (baris.length) return unik(baris);
-  return unik(parseGrid(bersih));
+  if (baris.length) return lengkapkanSesi(baris);
+  const hariBaris = parseGridHariBaris(bersih);
+  if (hariBaris.length) return lengkapkanSesi(hariBaris);
+  return lengkapkanSesi(parseGrid(bersih));
 }
 
 export function susunSesi(sesi: SesiPdp[]) {

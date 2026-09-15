@@ -53,8 +53,8 @@ export default function PanduanPage() {
         <h2 className="font-heading text-lg font-medium">Jadual waktu dan RPH</h2>
         <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
           <li>
-            Buka <strong className="text-foreground">Jadual waktu</strong>, muat naik CSV/Excel/PDF yang
-            ada lajur KELAS, HARI, MASA, dan MATA PELAJARAN, kemudian simpan.
+            Buka <strong className="text-foreground">Jadual waktu</strong>, muat naik gambar/PDF jadual
+            guru (atau CSV/Excel dengan lajur KELAS, HARI, MASA, dan MATA PELAJARAN), kemudian simpan.
           </li>
           <li>
             Setiap slot menjadi sesi PdP. Dari <strong className="text-foreground">Borang RPH</strong>,
@@ -70,10 +70,11 @@ export default function PanduanPage() {
       <section className="space-y-2">
         <h2 className="font-heading text-lg font-medium">Analisis PDF</h2>
         <p className="text-sm text-muted-foreground">
-          Parser DSKP membaca kod 1.0 / 1.1 / 1.1.1 terus daripada teks PDF. Jika anda isi{" "}
+          Parser DSKP membaca kod 1.0 / 1.1 / 1.1.1 terus daripada teks PDF. Gambar atau PDF imbasan
+          jadual guru dibaca dengan OCR. Jika anda isi{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">GOOGLE_GENERATIVE_AI_API_KEY</code> atau{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">OPENAI_API_KEY</code>, sistem akan
-          membetulkan lajur yang terpecah dengan AI.
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">OPENAI_API_KEY</code>, sistem boleh
+          membetulkan DSKP yang terpecah dan PDF jadual yang sukar dibaca.
         </p>
       </section>
     </div>

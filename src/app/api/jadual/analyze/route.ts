@@ -2,11 +2,29 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { extractPdfText } from "@/lib/dskp/extract-pdf";
 import { parseCsv, parseJadualMatrix, parsePdfJadual, susunSesi } from "@/lib/jadual/parse";
+import {
+  analyzeJadualVision,
+  hasVisionProvider,
+  ialahGambarJadual,
+  mediaTypeJadual,
+} from "@/lib/jadual/vision";
+import { analyzeJadualOcr } from "@/lib/jadual/ocr";
+import type { SesiPdp } from "@/lib/jadual/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 const MAX_BYTES = 10 * 1024 * 1024;
+
+function tiadaSesi() {
+  return NextResponse.json(
+    {
+      ralat:
+        "Tiada sesi PdP dijumpai. Muat naik gambar/PDF jadual guru, atau fail dengan lajur KELAS, HARI, MASA, dan MATA PELAJARAN.",
+    },
+    { status: 422 }
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,34 +39,68 @@ export async function POST(request: Request) {
 
     const nama = file.name.toLowerCase();
     const bytes = new Uint8Array(await file.arrayBuffer());
-    let matrix: string[][] = [];
+    let sesi: SesiPdp[] = [];
 
     if (nama.endsWith(".csv") || nama.endsWith(".txt")) {
-      matrix = parseCsv(new TextDecoder().decode(bytes));
+      sesi = parseJadualMatrix(parseCsv(new TextDecoder().decode(bytes)));
     } else if (nama.endsWith(".xlsx") || nama.endsWith(".xls")) {
       const workbook = XLSX.read(bytes, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      matrix = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false, defval: "" });
+      const matrix = XLSX.utils.sheet_to_json<string[]>(sheet, {
+        header: 1,
+        raw: false,
+        defval: "",
+      });
+      sesi = parseJadualMatrix(matrix);
     } else if (nama.endsWith(".pdf")) {
       const extracted = await extractPdfText(bytes);
-      matrix = parsePdfJadual(extracted.text);
+      sesi = parseJadualMatrix(parsePdfJadual(extracted.text));
+      if (!sesi.length) {
+        if (!hasVisionProvider()) {
+          return NextResponse.json(
+            {
+              ralat:
+                "PDF ini nampak seperti imbasan. Untuk membacanya, tetapkan GOOGLE_GENERATIVE_AI_API_KEY, OPENAI_API_KEY, atau AI_GATEWAY_API_KEY.",
+            },
+            { status: 422 }
+          );
+        }
+        sesi = await analyzeJadualVision({
+          bytes,
+          mediaType: "application/pdf",
+        });
+      }
+    } else if (ialahGambarJadual(file.name, file.type)) {
+      sesi = await analyzeJadualOcr(bytes);
+      if (sesi.length < 3 && hasVisionProvider()) {
+        try {
+          const ai = await analyzeJadualVision({
+            bytes,
+            mediaType: mediaTypeJadual(file.name, file.type),
+          });
+          if (ai.length > sesi.length) sesi = ai;
+        } catch (error) {
+          if (!sesi.length) throw error;
+        }
+      }
+      if (!sesi.length) {
+        return NextResponse.json(
+          {
+            ralat:
+              "Gambar jadual tidak dapat dibaca. Pastikan grid hari dan waktu nampak jelas, atau muat naik PDF/CSV.",
+          },
+          { status: 422 }
+        );
+      }
     } else {
       return NextResponse.json(
-        { ralat: "Gunakan CSV, Excel (.xlsx) atau PDF jadual waktu." },
+        { ralat: "Gunakan gambar (JPG/PNG), PDF, CSV, atau Excel jadual waktu." },
         { status: 400 }
       );
     }
 
-    const sesi = susunSesi(parseJadualMatrix(matrix));
-    if (!sesi.length) {
-      return NextResponse.json(
-        {
-          ralat:
-            "Tiada sesi PdP dijumpai. Pastikan lajur KELAS, HARI, MASA, dan MATA PELAJARAN ada dalam fail.",
-        },
-        { status: 422 }
-      );
-    }
+    sesi = susunSesi(sesi);
+    if (!sesi.length) return tiadaSesi();
 
     return NextResponse.json({ nama_fail: file.name, sesi });
   } catch (error) {

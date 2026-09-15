@@ -8,8 +8,8 @@ export default function JadualWaktuPage() {
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Tetapan jadual waktu</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Muat naik jadual waktu. Setiap slot menjadi sesi PdP (kelas, hari, masa, mata pelajaran)
-          yang disambungkan ke borang RPH.
+          Muat naik gambar atau PDF jadual guru. Setiap slot menjadi sesi PdP (hari, masa, kelas, mata
+          pelajaran) yang disambungkan ke borang RPH.
         </p>
       </div>
       <TetapanJadualWaktu />

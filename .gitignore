@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# tesseract
+*.traineddata
+.tesseract-cache/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

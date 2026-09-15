@@ -125,25 +125,27 @@ export function TetapanJadualWaktu() {
         <CalendarClock className="size-4" />
         <AlertTitle>Jadual menjana sesi PdP</AlertTitle>
         <AlertDescription>
-          Muat naik jadual dengan lajur <strong>KELAS</strong>, <strong>HARI</strong>,{" "}
-          <strong>MASA</strong>, dan <strong>MATA PELAJARAN</strong>. Setiap baris menjadi satu sesi
-          yang boleh dibuka sebagai borang RPH.
+          Muat naik gambar atau PDF jadual guru seperti Jadual Sidang Pagi. Sistem akan pecahkan setiap slot
+          mengikut <strong>hari</strong>, <strong>masa</strong>, <strong>kelas</strong>, dan{" "}
+          <strong>mata pelajaran</strong>. CSV/Excel dengan lajur yang sama juga diterima.
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
           <CardTitle>Muat naik jadual waktu</CardTitle>
-          <CardDescription>CSV, Excel (.xlsx) atau PDF. Fail contoh boleh dimuat turun.</CardDescription>
+          <CardDescription>
+            Gambar JPG/PNG, PDF imbasan, CSV atau Excel. Fail contoh CSV boleh dimuat turun.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center hover:bg-muted/40">
             <FileUp className="mb-3 size-8 text-muted-foreground" />
-            <p className="text-sm font-medium">Letak fail jadual di sini atau pilih fail</p>
-            <p className="mt-1 text-xs text-muted-foreground">CSV · XLSX · PDF · maksimum 10 MB</p>
+            <p className="text-sm font-medium">Letak gambar atau fail jadual di sini</p>
+            <p className="mt-1 text-xs text-muted-foreground">JPG · PNG · PDF · CSV · XLSX · maksimum 10 MB</p>
             <input
               type="file"
-              accept=".csv,.txt,.xlsx,.xls,.pdf"
+              accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic,.pdf,.csv,.txt,.xlsx,.xls"
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];
