@@ -10,7 +10,8 @@ export const fetchCache = "force-no-store";
 
 async function padam() {
   await connection();
-  const bilangan = await padamSemuaRph();
+  const cfg = supabaseRuntimeConfig();
+  const bilangan = await padamSemuaRph(cfg);
   return NextResponse.json(
     { bil_rph: bilangan },
     { headers: { "Cache-Control": "no-store" } }

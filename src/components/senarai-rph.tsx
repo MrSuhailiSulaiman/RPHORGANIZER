@@ -19,7 +19,6 @@ export function SenaraiRph() {
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangJana, setSedangJana] = useState(false);
   const [sedangPadam, setSedangPadam] = useState(false);
-  const [sahkanPadam, setSahkanPadam] = useState(false);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
@@ -116,17 +115,16 @@ export function SenaraiRph() {
       toast.error("Tiada RPH untuk dipadam.");
       return;
     }
-    if (!sahkanPadam) {
-      setSahkanPadam(true);
-      return;
-    }
     setSedangPadam(true);
     try {
-      const res = await fetch("/api/rph/tahun", { method: "POST", cache: "no-store" });
+      const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
       setRph([]);
-      setSahkanPadam(false);
       toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
@@ -174,11 +172,7 @@ export function SenaraiRph() {
             disabled={sedangJana || sedangPadam || !rph.length}
           >
             {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            {sedangPadam
-              ? "Memadam..."
-              : sahkanPadam
-                ? "Klik sekali lagi untuk padam"
-                : "Padam RPH setahun"}
+            {sedangPadam ? "Memadam..." : "Padam RPH setahun"}
           </Button>
         </CardContent>
       </Card>

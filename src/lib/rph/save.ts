@@ -280,8 +280,8 @@ async function padamId(ids: string[]) {
   return bilPadam(res);
 }
 
-export async function padamSemuaRph() {
-  const { url, key } = supabaseRuntimeConfig();
+export async function padamSemuaRph(kunci?: { url: string; key: string }) {
+  const { url, key } = kunci ?? supabaseRuntimeConfig();
   if (!url || !key) throw new Error("Supabase belum dikonfigurasi.");
 
   const rpc = await fetch(`${url}/rest/v1/rpc/padam_semua_rph`, {

@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { janaBahanKurikulum } from "@/lib/rph/generate";
-import { geminiApiKey } from "@/lib/runtime-env";
+import { geminiApiKey, supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
   BIL_MINGGU_TAHUN,
@@ -118,7 +118,8 @@ export async function POST(request: Request) {
     });
 
     const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_TAHUN, "JUMAAT");
-    await padamSemuaRph();
+    const cfg = supabaseRuntimeConfig();
+    await padamSemuaRph(cfg);
     const bilangan = await simpanRphPukal(rekod);
 
     return NextResponse.json({
