@@ -253,6 +253,16 @@ function kunciPadam(kunci?: KunciSupabase): KunciSupabase {
   return { url: cfg.url, key: cfg.key };
 }
 
+function perananJwt(key: string) {
+  try {
+    return String(
+      JSON.parse(Buffer.from(key.split(".")[1] || "", "base64url").toString()).role ?? ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 function kepalaPadam(key: string) {
   return {
     apikey: key,
@@ -271,10 +281,14 @@ async function senaraiSemuaIdRph(kunci: KunciSupabase) {
     });
     if (!res.ok) throw skemaRalat({ message: await res.text() });
     const data = (await res.json()) as { id?: string }[];
-    ids.push(...data.map((row) => String(row.id)));
+    ids.push(...data.map((row) => String(row.id)).filter((id) => id && id !== "undefined"));
     if (data.length < 1000) break;
   }
   return ids;
+}
+
+export async function bilanganSemuaRph(kunci?: KunciSupabase) {
+  return (await senaraiSemuaIdRph(kunciPadam(kunci))).length;
 }
 
 async function padamSemuaBaris(kunci: KunciSupabase) {
@@ -299,72 +313,33 @@ async function padamId(kunci: KunciSupabase, ids: string[]) {
   return bilPadam(res);
 }
 
-async function tandaDipadam(kunci: KunciSupabase, ids: string[]) {
-  for (let i = 0; i < ids.length; i += 16) {
-    const bahagian = ids.slice(i, i + 16);
-    await Promise.all(
-      bahagian.map((id) =>
-        fetch(`${kunci.url}/rest/v1/rpc/simpan_rph`, {
-          method: "POST",
-          headers: {
-            apikey: kunci.key,
-            Authorization: `Bearer ${kunci.key}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ payload: { id, mata_pelajaran: RPH_PADAM } }),
-          cache: "no-store",
-        })
-      )
-    );
-  }
-}
-
 export async function padamSemuaRph(kunci?: KunciSupabase) {
   const auth = kunciPadam(kunci);
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
+  if (perananJwt(auth.key) !== "service_role") {
+    throw new Error("Padam RPH memerlukan SUPABASE_SERVICE_ROLE_KEY. Rekod dalam Supabase tidak dipadam.");
+  }
 
   const sebelum = await senaraiSemuaIdRph(auth);
   if (!sebelum.length) return 0;
 
-  const rpc = await fetch(`${auth.url}/rest/v1/rpc/padam_semua_rph`, {
-    method: "POST",
-    headers: {
-      apikey: auth.key,
-      Authorization: `Bearer ${auth.key}`,
-      "Content-Type": "application/json",
-    },
-    body: "{}",
-    cache: "no-store",
-  });
-  if (rpc.ok) {
-    const bakiRpc = await senaraiSemuaIdRph(auth);
-    if (!bakiRpc.length) {
-      const bil = Number(await rpc.text());
-      return Number.isFinite(bil) && bil > 0 ? bil : sebelum.length;
+  for (let cubaan = 0; cubaan < 6; cubaan += 1) {
+    await padamSemuaBaris(auth);
+    let ids = await senaraiSemuaIdRph(auth);
+    if (!ids.length) return sebelum.length;
+    for (let i = 0; i < ids.length; i += 50) {
+      await padamId(auth, ids.slice(i, i + 50));
     }
-  }
-
-  let bil = 0;
-  for (let cubaan = 0; cubaan < 8; cubaan += 1) {
-    try {
-      bil = Math.max(bil, await padamSemuaBaris(auth));
-    } catch {
-      // Cubaan seterusnya memadam ikut id.
-    }
-    const ids = await senaraiSemuaIdRph(auth);
-    if (!ids.length) return Math.max(bil, sebelum.length);
-    let kaliIni = 0;
-    for (let i = 0; i < ids.length; i += 80) {
-      kaliIni += await padamId(auth, ids.slice(i, i + 80));
-    }
-    bil += kaliIni;
-    const baki = await senaraiSemuaIdRph(auth);
-    if (!baki.length) return Math.max(bil, sebelum.length);
-    await new Promise((selesai) => setTimeout(selesai, 200 * (cubaan + 1)));
+    ids = await senaraiSemuaIdRph(auth);
+    if (!ids.length) return sebelum.length;
   }
 
   const tinggal = await senaraiSemuaIdRph(auth);
-  if (tinggal.length) await tandaDipadam(auth, tinggal);
+  if (tinggal.length) {
+    throw new Error(
+      `RPH tidak dapat dipadam daripada pangkalan data. ${tinggal.length} rekod termasuk id masih wujud dalam Supabase.`
+    );
+  }
   return sebelum.length;
 }
 

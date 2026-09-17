@@ -116,29 +116,22 @@ export function SenaraiRph() {
   async function padamRphTahun() {
     setSedangPadam(true);
     try {
-      let json: { ralat?: string; bil_rph?: number } = {};
-      let baki = rph;
-      for (let cubaan = 0; cubaan < 4; cubaan += 1) {
-        const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Cache-Control": "no-store" },
-        });
-        json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
-        if (!res.ok) {
-          if (cubaan === 3) throw new Error(json.ralat ?? "Gagal memadam RPH.");
-          await new Promise((selesai) => setTimeout(selesai, 400 * (cubaan + 1)));
-          continue;
-        }
-        baki = await muat();
-        if (!baki.length) break;
-        await new Promise((selesai) => setTimeout(selesai, 400 * (cubaan + 1)));
+      const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ralat?: string;
+        bil_rph?: number;
+        baki?: number;
+      };
+      if (!res.ok || (json.baki ?? 0) > 0) {
+        throw new Error(json.ralat ?? "Gagal memadam RPH daripada Supabase.");
       }
-      if (baki.length) {
-        throw new Error("RPH tidak dapat dipadam daripada pangkalan data. Rekod termasuk id masih wujud.");
-      }
+      await muat();
       setRph([]);
-      toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
+      toast.success(`${json.bil_rph ?? 0} RPH telah dipadam daripada Supabase.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
