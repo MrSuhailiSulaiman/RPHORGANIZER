@@ -22,7 +22,10 @@ export function SenaraiRph() {
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
-    const [jadualRes, rphRes] = await Promise.all([fetch("/api/jadual"), fetch("/api/rph")]);
+    const [jadualRes, rphRes] = await Promise.all([
+      fetch("/api/jadual", { cache: "no-store" }),
+      fetch("/api/rph", { cache: "no-store" }),
+    ]);
     const jadualJson = await jadualRes.json();
     const rphJson = await rphRes.json();
     if (!jadualRes.ok) throw new Error(jadualJson.ralat ?? "Gagal memuatkan jadual.");
@@ -121,6 +124,7 @@ export function SenaraiRph() {
       const res = await fetch("/api/rph/tahun", { method: "POST", cache: "no-store" });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      setRph([]);
       await muat();
       toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
     } catch (error) {

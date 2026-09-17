@@ -1,10 +1,13 @@
+import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { getKurikulum, senaraiRph, simpanRph } from "@/lib/rph/save";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function GET(request: Request) {
+  await connection();
   const url = new URL(request.url);
   const kurikulum = url.searchParams.get("kurikulum");
   const mata = url.searchParams.get("mata_pelajaran") ?? "";
@@ -25,7 +28,10 @@ export async function GET(request: Request) {
   }
   try {
     const rph = await senaraiRph();
-    return NextResponse.json({ dikonfigurasi: true, rph });
+    return NextResponse.json(
+      { dikonfigurasi: true, rph },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal memuatkan RPH.";
     return NextResponse.json({ ralat: mesej }, { status: 500 });

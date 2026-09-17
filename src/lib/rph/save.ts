@@ -240,6 +240,12 @@ export async function padamRphDalamTempoh(mula: string, tamat: string) {
   throw skemaRalat(rpcRalat);
 }
 
+function bilPadam(res: Response) {
+  const julat = res.headers.get("content-range") ?? "";
+  const padanan = /\/(\d+)\s*$/.exec(julat);
+  return padanan ? Number(padanan[1]) : 0;
+}
+
 async function senaraiSemuaIdRph() {
   const { url, key } = supabaseRuntimeConfig();
   if (!url || !key) return [];
@@ -266,13 +272,12 @@ async function padamId(ids: string[]) {
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
-      Prefer: "return=representation",
+      Prefer: "return=minimal,count=exact",
     },
     cache: "no-store",
   });
   if (!res.ok) throw skemaRalat({ message: await res.text() });
-  const data = (await res.json().catch(() => [])) as unknown[];
-  return Array.isArray(data) ? data.length : 0;
+  return bilPadam(res);
 }
 
 export async function padamSemuaRph() {
@@ -300,14 +305,13 @@ export async function padamSemuaRph() {
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
-      Prefer: "return=representation,count=exact",
+      Prefer: "return=minimal,count=exact",
     },
     cache: "no-store",
   });
   if (semua.ok) {
-    const data = (await semua.json().catch(() => [])) as unknown[];
     const baki = await senaraiSemuaIdRph();
-    if (!baki.length) return Array.isArray(data) ? data.length : 0;
+    if (!baki.length) return bilPadam(semua);
   }
 
   let bil = 0;
