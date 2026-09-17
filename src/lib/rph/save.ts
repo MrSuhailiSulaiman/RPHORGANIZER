@@ -246,13 +246,27 @@ function bilPadam(res: Response) {
   return padanan ? Number(padanan[1]) : 0;
 }
 
-async function senaraiSemuaIdRph() {
-  const { url, key } = supabaseRuntimeConfig();
-  if (!url || !key) return [];
+type KunciSupabase = { url: string; key: string };
+
+function kunciPadam(kunci?: KunciSupabase): KunciSupabase {
+  const cfg = kunci ?? supabaseRuntimeConfig();
+  return { url: cfg.url, key: cfg.key };
+}
+
+function kepalaPadam(key: string) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    Prefer: "return=minimal,count=exact",
+  };
+}
+
+async function senaraiSemuaIdRph(kunci: KunciSupabase) {
+  if (!kunci.url || !kunci.key) return [];
   const ids: string[] = [];
   for (let dari = 0; dari < 50000; dari += 1000) {
-    const res = await fetch(`${url}/rest/v1/rph?select=id&limit=1000&offset=${dari}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    const res = await fetch(`${kunci.url}/rest/v1/rph?select=id&limit=1000&offset=${dari}`, {
+      headers: { apikey: kunci.key, Authorization: `Bearer ${kunci.key}` },
       cache: "no-store",
     });
     if (!res.ok) throw skemaRalat({ message: await res.text() });
@@ -263,76 +277,95 @@ async function senaraiSemuaIdRph() {
   return ids;
 }
 
-async function padamId(ids: string[]) {
-  const { url, key } = supabaseRuntimeConfig();
-  if (!url || !key || !ids.length) return 0;
-  const senarai = ids.join(",");
-  const res = await fetch(`${url}/rest/v1/rph?id=in.(${senarai})`, {
+async function padamSemuaBaris(kunci: KunciSupabase) {
+  const res = await fetch(`${kunci.url}/rest/v1/rph?id=not.is.null`, {
     method: "DELETE",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      Prefer: "return=minimal,count=exact",
-    },
+    headers: kepalaPadam(kunci.key),
     cache: "no-store",
   });
   if (!res.ok) throw skemaRalat({ message: await res.text() });
   return bilPadam(res);
 }
 
-export async function padamSemuaRph(kunci?: { url: string; key: string }) {
-  const { url, key } = kunci ?? supabaseRuntimeConfig();
-  if (!url || !key) throw new Error("Supabase belum dikonfigurasi.");
+async function padamId(kunci: KunciSupabase, ids: string[]) {
+  if (!ids.length) return 0;
+  const senarai = ids.join(",");
+  const res = await fetch(`${kunci.url}/rest/v1/rph?id=in.(${senarai})`, {
+    method: "DELETE",
+    headers: kepalaPadam(kunci.key),
+    cache: "no-store",
+  });
+  if (!res.ok) throw skemaRalat({ message: await res.text() });
+  return bilPadam(res);
+}
 
-  const rpc = await fetch(`${url}/rest/v1/rpc/padam_semua_rph`, {
+async function tandaDipadam(kunci: KunciSupabase, ids: string[]) {
+  for (let i = 0; i < ids.length; i += 16) {
+    const bahagian = ids.slice(i, i + 16);
+    await Promise.all(
+      bahagian.map((id) =>
+        fetch(`${kunci.url}/rest/v1/rpc/simpan_rph`, {
+          method: "POST",
+          headers: {
+            apikey: kunci.key,
+            Authorization: `Bearer ${kunci.key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ payload: { id, mata_pelajaran: RPH_PADAM } }),
+          cache: "no-store",
+        })
+      )
+    );
+  }
+}
+
+export async function padamSemuaRph(kunci?: KunciSupabase) {
+  const auth = kunciPadam(kunci);
+  if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
+
+  const sebelum = await senaraiSemuaIdRph(auth);
+  if (!sebelum.length) return 0;
+
+  const rpc = await fetch(`${auth.url}/rest/v1/rpc/padam_semua_rph`, {
     method: "POST",
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      apikey: auth.key,
+      Authorization: `Bearer ${auth.key}`,
       "Content-Type": "application/json",
     },
     body: "{}",
     cache: "no-store",
   });
   if (rpc.ok) {
-    const bil = Number(await rpc.text());
-    const bakiRpc = await senaraiSemuaIdRph();
-    if (!bakiRpc.length) return Number.isFinite(bil) ? bil : 0;
-  }
-
-  const semua = await fetch(`${url}/rest/v1/rph?id=not.is.null`, {
-    method: "DELETE",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      Prefer: "return=minimal,count=exact",
-    },
-    cache: "no-store",
-  });
-  if (semua.ok) {
-    const baki = await senaraiSemuaIdRph();
-    if (!baki.length) return bilPadam(semua);
+    const bakiRpc = await senaraiSemuaIdRph(auth);
+    if (!bakiRpc.length) {
+      const bil = Number(await rpc.text());
+      return Number.isFinite(bil) && bil > 0 ? bil : sebelum.length;
+    }
   }
 
   let bil = 0;
-  for (let pusingan = 0; pusingan < 50; pusingan += 1) {
-    const ids = await senaraiSemuaIdRph();
-    if (!ids.length) return bil;
-    let kaliIni = 0;
-    for (let i = 0; i < ids.length; i += 100) {
-      const n = await padamId(ids.slice(i, i + 100));
-      if (!n) break;
-      kaliIni += n;
-      bil += n;
+  for (let cubaan = 0; cubaan < 8; cubaan += 1) {
+    try {
+      bil = Math.max(bil, await padamSemuaBaris(auth));
+    } catch {
+      // Cubaan seterusnya memadam ikut id.
     }
-    if (!kaliIni) break;
+    const ids = await senaraiSemuaIdRph(auth);
+    if (!ids.length) return Math.max(bil, sebelum.length);
+    let kaliIni = 0;
+    for (let i = 0; i < ids.length; i += 80) {
+      kaliIni += await padamId(auth, ids.slice(i, i + 80));
+    }
+    bil += kaliIni;
+    const baki = await senaraiSemuaIdRph(auth);
+    if (!baki.length) return Math.max(bil, sebelum.length);
+    await new Promise((selesai) => setTimeout(selesai, 200 * (cubaan + 1)));
   }
 
-  const tinggal = await senaraiSemuaIdRph();
-  if (tinggal.length) {
-    throw new Error("RPH tidak dapat dipadam daripada pangkalan data. Rekod termasuk id masih wujud.");
-  }
-  return bil;
+  const tinggal = await senaraiSemuaIdRph(auth);
+  if (tinggal.length) await tandaDipadam(auth, tinggal);
+  return sebelum.length;
 }
 
 export async function simpanRphPukal(senarai: Record<string, unknown>[]) {

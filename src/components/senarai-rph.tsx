@@ -22,16 +22,19 @@ export function SenaraiRph() {
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
+    const cap = Date.now();
     const [jadualRes, rphRes] = await Promise.all([
-      fetch("/api/jadual", { cache: "no-store" }),
-      fetch("/api/rph", { cache: "no-store" }),
+      fetch(`/api/jadual?t=${cap}`, { cache: "no-store" }),
+      fetch(`/api/rph?t=${cap}`, { cache: "no-store" }),
     ]);
     const jadualJson = await jadualRes.json();
     const rphJson = await rphRes.json();
     if (!jadualRes.ok) throw new Error(jadualJson.ralat ?? "Gagal memuatkan jadual.");
     if (!rphRes.ok) throw new Error(rphJson.ralat ?? "Gagal memuatkan RPH.");
+    const senarai = (rphJson.rph ?? []) as RphRekod[];
     setSesi(jadualJson.sesi ?? []);
-    setRph(rphJson.rph ?? []);
+    setRph(senarai);
+    return senarai;
   }
 
   useEffect(() => {
@@ -111,19 +114,29 @@ export function SenaraiRph() {
   }
 
   async function padamRphTahun() {
-    if (!rph.length) {
-      toast.error("Tiada RPH untuk dipadam.");
-      return;
-    }
     setSedangPadam(true);
     try {
-      const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      let json: { ralat?: string; bil_rph?: number } = {};
+      let baki = rph;
+      for (let cubaan = 0; cubaan < 4; cubaan += 1) {
+        const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
+        json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
+        if (!res.ok) {
+          if (cubaan === 3) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+          await new Promise((selesai) => setTimeout(selesai, 400 * (cubaan + 1)));
+          continue;
+        }
+        baki = await muat();
+        if (!baki.length) break;
+        await new Promise((selesai) => setTimeout(selesai, 400 * (cubaan + 1)));
+      }
+      if (baki.length) {
+        throw new Error("RPH tidak dapat dipadam daripada pangkalan data. Rekod termasuk id masih wujud.");
+      }
       setRph([]);
       toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
     } catch (error) {
@@ -169,7 +182,7 @@ export function SenaraiRph() {
             type="button"
             variant="destructive"
             onClick={() => void padamRphTahun()}
-            disabled={sedangJana || sedangPadam || !rph.length}
+            disabled={sedangJana || sedangPadam}
           >
             {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
             {sedangPadam ? "Memadam..." : "Padam RPH setahun"}
