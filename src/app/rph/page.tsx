@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SenaraiRph } from "@/components/senarai-rph";
 
 export const dynamic = "force-dynamic";
 
-export default function RphPage() {
+export default async function RphPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ padam?: string; n?: string }>;
+}) {
+  const { padam, n } = await searchParams;
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -25,9 +30,30 @@ export default function RphPage() {
           <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
+          <form action="/rph/padam" method="post">
+            <Button type="submit" variant="destructive">
+              <Trash2 />
+              Padam RPH setahun
+            </Button>
+          </form>
         </div>
       </div>
-      <SenaraiRph />
+      {padam === "ok" ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Semua rekod RPH telah dipadam daripada Supabase. Jadual waktu di bawah tidak dipadam.
+        </p>
+      ) : null}
+      {padam === "gagal" || padam === "kunci" ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Gagal memadam rekod RPH dalam Supabase. Cuba lagi.
+        </p>
+      ) : null}
+      {padam === "baki" ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {n ?? "Beberapa"} rekod RPH masih wujud dalam Supabase.
+        </p>
+      ) : null}
+      <SenaraiRph padamBerjaya={padam === "ok"} />
     </div>
   );
 }

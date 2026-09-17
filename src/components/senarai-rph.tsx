@@ -13,12 +13,11 @@ import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 
-export function SenaraiRph() {
+export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean }) {
   const [sesi, setSesi] = useState<SesiPdp[]>([]);
   const [rph, setRph] = useState<RphRekod[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangJana, setSedangJana] = useState(false);
-  const [sedangPadam, setSedangPadam] = useState(false);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
@@ -113,31 +112,11 @@ export function SenaraiRph() {
     }
   }
 
-  async function padamRphTahun() {
-    setSedangPadam(true);
-    try {
-      const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        ralat?: string;
-        bil_rph?: number;
-        baki?: number;
-      };
-      if (!res.ok || (json.baki ?? 0) > 0) {
-        throw new Error(json.ralat ?? "Gagal memadam RPH daripada Supabase.");
-      }
-      await muat();
-      setRph([]);
-      toast.success(`${json.bil_rph ?? 0} RPH telah dipadam daripada Supabase.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
-    } finally {
-      setSedangPadam(false);
-    }
-  }
+  useEffect(() => {
+    if (!padamBerjaya) return;
+    setRph([]);
+    toast.success("Semua RPH telah dipadam daripada Supabase.");
+  }, [padamBerjaya]);
 
   if (sedangMuat) {
     return (
@@ -167,19 +146,16 @@ export function SenaraiRph() {
               className="w-44"
             />
           </label>
-          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana || sedangPadam || !sesi.length}>
+          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana || !sesi.length}>
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => void padamRphTahun()}
-            disabled={sedangJana || sedangPadam}
-          >
-            {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            {sedangPadam ? "Memadam..." : "Padam RPH setahun"}
-          </Button>
+          <form action="/rph/padam" method="post">
+            <Button type="submit" variant="destructive" disabled={sedangJana}>
+              <Trash2 />
+              Padam RPH setahun
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
