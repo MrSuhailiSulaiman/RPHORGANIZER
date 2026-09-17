@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
+import { padamRphSetahunAction } from "@/app/rph/actions";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 
 export function SenaraiRph() {
@@ -19,6 +20,7 @@ export function SenaraiRph() {
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangJana, setSedangJana] = useState(false);
   const [sedangPadam, setSedangPadam] = useState(false);
+  const [sahkanPadam, setSahkanPadam] = useState(false);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
@@ -115,18 +117,17 @@ export function SenaraiRph() {
       toast.error("Tiada RPH untuk dipadam.");
       return;
     }
-    const sah = window.confirm(
-      "Semua RPH yang telah dijana akan dipadam. Tindakan ini tidak boleh dibatalkan."
-    );
-    if (!sah) return;
+    if (!sahkanPadam) {
+      setSahkanPadam(true);
+      return;
+    }
     setSedangPadam(true);
     try {
-      const res = await fetch("/api/rph/tahun", { method: "POST", cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      const hasil = await padamRphSetahunAction();
+      if (!hasil.ok) throw new Error(hasil.ralat);
       setRph([]);
-      await muat();
-      toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
+      setSahkanPadam(false);
+      toast.success(`${hasil.bil_rph} RPH setahun telah dipadam.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
@@ -173,10 +174,20 @@ export function SenaraiRph() {
             disabled={sedangJana || sedangPadam || !rph.length}
           >
             {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            {sedangPadam ? "Memadam..." : "Padam RPH setahun"}
+            {sedangPadam
+              ? "Memadam..."
+              : sahkanPadam
+                ? "Klik sekali lagi untuk padam"
+                : "Padam RPH setahun"}
           </Button>
         </CardContent>
       </Card>
+
+      {!rph.length && sesi.length ? (
+        <p className="text-sm text-muted-foreground">
+          Tiada RPH. Sesi PdP di bawah ialah jadual waktu, bukan rekod RPH.
+        </p>
+      ) : null}
 
       {kumpulanMinggu.length ? (
         <div className="space-y-4">
