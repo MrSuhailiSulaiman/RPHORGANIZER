@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
-import { padamRphSetahunAction } from "@/app/rph/actions";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 
 export function SenaraiRph() {
@@ -123,11 +122,12 @@ export function SenaraiRph() {
     }
     setSedangPadam(true);
     try {
-      const hasil = await padamRphSetahunAction();
-      if (!hasil.ok) throw new Error(hasil.ralat);
+      const res = await fetch("/api/rph/tahun", { method: "POST", cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil_rph?: number };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
       setRph([]);
       setSahkanPadam(false);
-      toast.success(`${hasil.bil_rph} RPH setahun telah dipadam.`);
+      toast.success(`${json.bil_rph ?? 0} RPH setahun telah dipadam.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
