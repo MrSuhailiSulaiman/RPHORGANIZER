@@ -91,14 +91,11 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
   }, [rph]);
 
   async function janaRph() {
+    if (sedangJana) return;
     if (!sesi.length) {
       toast.error("Tetapkan jadual waktu dahulu.");
       return;
     }
-    const sah = window.confirm(
-      "RPH setahun (40 minggu) akan dijana mengikut jadual dan susunan DSKP. RPH sedia ada dalam tempoh ini akan diganti."
-    );
-    if (!sah) return;
     setSedangJana(true);
     try {
       const res = await fetch("/api/rph/generate", {
@@ -138,11 +135,11 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
               <span className="text-muted-foreground">Tarikh mula (Isnin)</span>
               <Input type="date" value={tarikhMula} disabled className="w-44" />
             </label>
-            <Button type="button" disabled>
-              <Loader2 className="animate-spin" />
-              Memuatkan...
+            <Button type="button" onClick={() => void janaRph()} disabled={sedangJana}>
+              {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {sedangJana ? "Menjana RPH..." : "Generate RPH"}
             </Button>
-            <BorangPadamRph />
+            <BorangPadamRph disabled={sedangJana} />
           </CardContent>
         </Card>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -172,7 +169,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
               className="w-44"
             />
           </label>
-          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana || !sesi.length}>
+          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana}>
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>

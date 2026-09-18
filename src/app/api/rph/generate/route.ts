@@ -13,7 +13,7 @@ import {
 } from "@/lib/rph/tahun";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
@@ -36,6 +36,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await connection();
+    geminiApiKey();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
     const gemini = kunciGeminiSedia();
     if (!gemini) {
@@ -119,7 +120,11 @@ export async function POST(request: Request) {
 
     const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_TAHUN, "JUMAAT");
     const cfg = supabaseRuntimeConfig();
-    await padamSemuaRph(cfg);
+    try {
+      await padamSemuaRph(cfg);
+    } catch (error) {
+      console.error("padam_sebelum_jana", error instanceof Error ? error.message : error);
+    }
     const bilangan = await simpanRphPukal(rekod);
 
     return NextResponse.json({
