@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,8 @@ export function BorangRph({
   const [kurikulum, setKurikulum] = useState<KurikulumPilihan | null>(null);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangSimpan, setSedangSimpan] = useState(false);
+  const [sedangPadam, setSedangPadam] = useState(false);
+  const [sedangJana, setSedangJana] = useState(false);
 
   useEffect(() => {
     let hidup = true;
@@ -236,6 +238,71 @@ export function BorangRph({
     }
   }
 
+  async function padam() {
+    if (!borang.id || sedangPadam) return;
+    setSedangPadam(true);
+    try {
+      const res = await fetch(`/api/rph/${borang.id}`, { method: "DELETE", cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      toast.success("Rekod RPH dipadam.");
+      router.push("/rph");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
+    } finally {
+      setSedangPadam(false);
+    }
+  }
+
+  async function janaSesi() {
+    if (sedangJana) return;
+    const standard = borang.standard_pembelajaran.filter((item) => item.pernyataan.trim());
+    if (!standard.length) {
+      toast.error("Pilih standard pembelajaran dahulu.");
+      return;
+    }
+    setSedangJana(true);
+    try {
+      const res = await fetch("/api/rph/generate-sesi", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mata_pelajaran: borang.mata_pelajaran,
+          tingkatan: borang.tingkatan,
+          kelas: borang.kelas,
+          hari: borang.hari,
+          masa: borang.masa,
+          bidang_nama: borang.bidang_nama,
+          sk_kod: borang.sk_kod,
+          sk_tajuk: borang.sk_tajuk,
+          standard_pembelajaran: standard,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ralat?: string;
+        objektif?: string[];
+        aktiviti?: string[];
+        bbm?: string;
+        nilai?: string;
+      };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana RPH sesi.");
+      setBorang((current) => ({
+        ...current,
+        objektif: json.objektif?.length ? json.objektif : current.objektif,
+        aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti,
+        bbm: json.bbm?.trim() ? json.bbm : current.bbm,
+        nilai: json.nilai?.trim() ? json.nilai : current.nilai,
+      }));
+      toast.success("Objektif dan aktiviti berpusatkan murid telah dijana. Semak kemudian simpan.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menjana RPH sesi.");
+    } finally {
+      setSedangJana(false);
+    }
+  }
+
   if (sedangMuat) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -246,6 +313,12 @@ export function BorangRph({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
+          {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          {sedangJana ? "Menjana RPH..." : "Generate RPH"}
+        </Button>
+      </div>
       <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
@@ -417,11 +490,11 @@ export function BorangRph({
               <th className={labelCell}>Objektif pembelajaran</th>
               <td className={`${cell} space-y-2`} colSpan={5}>
                 {borang.objektif.map((item, index) => (
-                  <Input
+                  <Textarea
                     key={index}
-                    className={field}
+                    className="min-h-16 rounded-none border-0 shadow-none focus-visible:ring-0"
                     value={item}
-                    placeholder="Murid dapat ..."
+                    placeholder="Murid dapat ... (terperinci dan boleh diukur)"
                     onChange={(event) =>
                       setBorang((current) => ({
                         ...current,
@@ -464,10 +537,10 @@ export function BorangRph({
               <th className={labelCell}>Ringkasan aktiviti</th>
               <td className={`${cell} space-y-1`} colSpan={5}>
                 {borang.aktiviti.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="w-6 text-right text-xs text-slate-500">{index + 1}.</span>
-                    <Input
-                      className={field}
+                  <div key={index} className="flex items-start gap-2">
+                    <span className="mt-2 w-6 text-right text-xs text-slate-500">{index + 1}.</span>
+                    <Textarea
+                      className="min-h-16 rounded-none border-0 shadow-none focus-visible:ring-0"
                       value={item}
                       onChange={(event) =>
                         setBorang((current) => ({
@@ -554,8 +627,18 @@ export function BorangRph({
         </table>
       </div>
       <div className="flex justify-end gap-2">
+        {borang.id ? (
+          <Button type="button" variant="destructive" onClick={() => void padam()} disabled={sedangPadam}>
+            {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            Padam RPH
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" onClick={() => window.print()}>
           Cetak
+        </Button>
+        <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
+          {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          {sedangJana ? "Menjana RPH..." : "Generate RPH"}
         </Button>
         <Button type="button" onClick={() => void simpan()} disabled={sedangSimpan}>
           {sedangSimpan ? <Loader2 className="animate-spin" /> : null}

@@ -67,7 +67,7 @@ Teks DSKP (bahagian relevan):
 ${params.text.slice(0, 40000)}`;
 
   const model = hasGoogleKey()
-    ? createGoogleGenerativeAI({ apiKey: geminiApiKey() })("gemini-2.5-flash")
+    ? createGoogleGenerativeAI({ apiKey: geminiApiKey() })("gemini-3.6-flash")
     : openai("gpt-4o");
 
   const content =

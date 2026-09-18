@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Loader2, Sparkles } from "lucide-react";
+import { ClipboardList, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { BorangPadamRph } from "@/components/borang-padam-rph";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,17 +13,14 @@ import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 
-export function SenaraiRph({
-  padamBerjaya = false,
-  padamAction,
-}: {
-  padamBerjaya?: boolean;
-  padamAction: string;
-}) {
+export function SenaraiRph() {
   const [sesi, setSesi] = useState<SesiPdp[]>([]);
   const [rph, setRph] = useState<RphRekod[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangJana, setSedangJana] = useState(false);
+  const [padamId, setPadamId] = useState<string | null>(null);
+  const [dipilih, setDipilih] = useState<string[]>([]);
+  const [sedangPukal, setSedangPukal] = useState(false);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
@@ -45,15 +41,10 @@ export function SenaraiRph({
 
   useEffect(() => {
     let hidup = true;
-    if (padamBerjaya) {
-      setRph([]);
-      toast.success("Semua rekod dalam jadual rph telah dipadam.");
-    }
     muat()
       .then((senarai) => {
         if (!hidup) return;
-        if (padamBerjaya) setRph([]);
-        else setRph(senarai);
+        setRph(senarai);
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Gagal memuatkan."))
       .finally(() => {
@@ -62,7 +53,7 @@ export function SenaraiRph({
     return () => {
       hidup = false;
     };
-  }, [padamBerjaya]);
+  }, []);
 
   const kumpulan = useMemo(
     () =>
@@ -95,6 +86,58 @@ export function SenaraiRph({
         item,
       }));
   }, [rph]);
+
+  async function padamRph(id: string) {
+    if (padamId) return;
+    setPadamId(id);
+    try {
+      const res = await fetch(`/api/rph/${id}`, { method: "DELETE", cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      setRph((senarai) => senarai.filter((item) => item.id !== id));
+      setDipilih((senarai) => senarai.filter((item) => item !== id));
+      toast.success("Rekod RPH dipadam.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
+    } finally {
+      setPadamId(null);
+    }
+  }
+
+  function togolDipilih(id: string) {
+    setDipilih((senarai) => (senarai.includes(id) ? senarai.filter((item) => item !== id) : [...senarai, id]));
+  }
+
+  function togolSemua(ids: string[], pilih: boolean) {
+    setDipilih((senarai) => {
+      if (pilih) return [...new Set([...senarai, ...ids])];
+      const buang = new Set(ids);
+      return senarai.filter((id) => !buang.has(id));
+    });
+  }
+
+  async function padamPukal() {
+    if (!dipilih.length || sedangPukal || padamId) return;
+    setSedangPukal(true);
+    try {
+      const res = await fetch("/api/rph", {
+        method: "DELETE",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: dipilih }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil?: number };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      const buang = new Set(dipilih);
+      setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
+      setDipilih([]);
+      toast.success(`${json.bil ?? buang.size} rekod RPH dipadam.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
+    } finally {
+      setSedangPukal(false);
+    }
+  }
 
   async function janaRph() {
     if (sedangJana) return;
@@ -145,7 +188,6 @@ export function SenaraiRph({
               {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
               {sedangJana ? "Menjana RPH..." : "Generate RPH"}
             </Button>
-            <BorangPadamRph action={padamAction} />
           </CardContent>
         </Card>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -179,60 +221,120 @@ export function SenaraiRph({
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
-          <BorangPadamRph action={padamAction} />
         </CardContent>
       </Card>
 
       {!rph.length && sesi.length ? (
-        <p className="text-sm text-muted-foreground">
-          Tiada RPH. Sesi PdP di bawah ialah jadual waktu, bukan rekod RPH.
+        <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          Tiada rekod dalam jadual rph. Senarai di bawah ialah <strong>jadual waktu (Sesi PdP)</strong>
+          , bukan RPH.
         </p>
       ) : null}
 
       {kumpulanMinggu.length ? (
         <div className="space-y-4">
-          <h2 className="font-heading text-lg font-medium">RPH mengikut minggu</h2>
-          {kumpulanMinggu.map((kumpul) => (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-heading text-lg font-medium">RPH mengikut minggu</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={Boolean(rph.length) && dipilih.length === rph.length}
+                  onChange={(event) => togolSemua(rph.map((item) => item.id), event.target.checked)}
+                />
+                Pilih semua
+              </label>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={!dipilih.length || sedangPukal || Boolean(padamId)}
+                onClick={() => void padamPukal()}
+              >
+                {sedangPukal ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                {dipilih.length ? `Padam ${dipilih.length} rekod` : "Padam dipilih"}
+              </Button>
+            </div>
+          </div>
+          {kumpulanMinggu.map((kumpul) => {
+            const idMinggu = kumpul.item.map((item) => item.id);
+            const bilDipilih = idMinggu.filter((id) => dipilih.includes(id)).length;
+            return (
             <Card key={kumpul.minggu}>
               <CardHeader>
-                <CardTitle>Minggu {kumpul.minggu}</CardTitle>
-                <CardDescription>
-                  {kumpul.tarikh_mula}
-                  {kumpul.tarikh_tamat && kumpul.tarikh_tamat !== kumpul.tarikh_mula
-                    ? ` — ${kumpul.tarikh_tamat}`
-                    : ""}
-                  {` · ${kumpul.item.length} sesi`}
-                </CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>Minggu {kumpul.minggu}</CardTitle>
+                    <CardDescription>
+                      {kumpul.tarikh_mula}
+                      {kumpul.tarikh_tamat && kumpul.tarikh_tamat !== kumpul.tarikh_mula
+                        ? ` — ${kumpul.tarikh_tamat}`
+                        : ""}
+                      {` · ${kumpul.item.length} sesi`}
+                    </CardDescription>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={idMinggu.length > 0 && bilDipilih === idMinggu.length}
+                      onChange={(event) => togolSemua(idMinggu, event.target.checked)}
+                    />
+                    Pilih minggu
+                  </label>
+                </div>
               </CardHeader>
               <CardContent className="grid gap-2">
                 {kumpul.item.map((item) => (
-                  <Link
+                  <div
                     key={item.id}
-                    href={`/rph/${item.id}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 hover:bg-muted/40"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2"
                   >
-                    <div>
-                      <p className="text-sm font-medium">
-                        {item.mata_pelajaran}
-                        <span className="ml-2 font-normal text-muted-foreground">
-                          {item.tingkatan ? `${item.tingkatan} ` : ""}
-                          {item.kelas}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {[item.tarikh, item.hari, item.masa].filter(Boolean).join(" · ")}
-                      </p>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4 shrink-0 accent-primary"
+                        checked={dipilih.includes(item.id)}
+                        onChange={() => togolDipilih(item.id)}
+                        aria-label={`Pilih ${item.mata_pelajaran} ${item.tarikh ?? ""}`}
+                      />
+                      <Link href={`/rph/${item.id}`} className="min-w-0 flex-1 hover:underline">
+                        <p className="text-sm font-medium">
+                          {item.mata_pelajaran}
+                          <span className="ml-2 font-normal text-muted-foreground">
+                            {item.tingkatan ? `${item.tingkatan} ` : ""}
+                            {item.kelas}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {[item.tarikh, item.hari, item.masa].filter(Boolean).join(" · ")}
+                        </p>
+                      </Link>
                     </div>
-                    {item.sk_kod ? (
-                      <Badge variant="secondary">
-                        {item.sk_kod} {item.sk_tajuk}
-                      </Badge>
-                    ) : null}
-                  </Link>
+                    <div className="flex items-center gap-2">
+                      {item.sk_kod ? (
+                        <Badge variant="secondary">
+                          {item.sk_kod} {item.sk_tajuk}
+                        </Badge>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={padamId === item.id || sedangPukal}
+                        onClick={() => void padamRph(item.id)}
+                      >
+                        {padamId === item.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                        Padam
+                      </Button>
+                    </div>
+                  </div>
                 ))}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
@@ -252,7 +354,7 @@ export function SenaraiRph({
         </Card>
       ) : (
         <div className="space-y-4">
-          <h2 className="font-heading text-lg font-medium">Sesi PdP mingguan</h2>
+          <h2 className="font-heading text-lg font-medium">Jadual waktu (Sesi PdP)</h2>
           {kumpulan.map((kumpul) => (
             <Card key={kumpul.hari}>
               <CardHeader>

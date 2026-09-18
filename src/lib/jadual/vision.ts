@@ -48,12 +48,12 @@ export function hasVisionProvider() {
 function modelVision() {
   const gemini = geminiApiKey();
   if (gemini) {
-    return createGoogleGenerativeAI({ apiKey: gemini })("gemini-2.5-flash");
+    return createGoogleGenerativeAI({ apiKey: gemini })("gemini-3.6-flash");
   }
   if (runtimeEnv("OPENAI_API_KEY")) {
     return openai("gpt-4o");
   }
-  return "google/gemini-2.5-flash";
+  return "google/gemini-3.6-flash";
 }
 
 export function mediaTypeJadual(nama: string, type?: string) {

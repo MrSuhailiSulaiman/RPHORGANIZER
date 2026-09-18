@@ -43,7 +43,7 @@ export async function GET() {
   const cfg = await kunciServisSupabase();
   const bil_rph = await bilanganSemuaRph(cfg);
   return json({
-    service_role: Boolean(cfg.key),
+    service_role: Boolean(cfg.url && cfg.key),
     bil_rph,
   });
 }

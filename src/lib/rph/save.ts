@@ -282,6 +282,17 @@ export async function bilanganSemuaRph(kunci?: KunciSupabase) {
 }
 
 async function padamSemuaBaris(kunci: KunciSupabase) {
+  const rpc = await fetch(`${kunci.url}/rest/v1/rpc/padam_semua_rph`, {
+    method: "POST",
+    headers: {
+      ...kepalaPadam(kunci.key),
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+    cache: "no-store",
+  });
+  if (rpc.ok) return Number((await rpc.text()) || "0");
+
   const res = await fetch(`${kunci.url}/rest/v1/rph?id=not.is.null`, {
     method: "DELETE",
     headers: kepalaPadam(kunci.key),
@@ -301,6 +312,57 @@ async function padamId(kunci: KunciSupabase, ids: string[]) {
   });
   if (!res.ok) throw skemaRalat({ message: await res.text() });
   return bilPadam(res);
+}
+
+export async function padamRph(id: string, kunci?: KunciSupabase) {
+  const auth = kunciPadam(kunci);
+  if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
+  const bersih = id.trim();
+  if (!bersih) throw new Error("Id RPH tidak sah.");
+
+  const res = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}`, {
+    method: "DELETE",
+    headers: kepalaPadam(auth.key),
+    cache: "no-store",
+  });
+  if (!res.ok) throw skemaRalat({ message: await res.text() });
+
+  const semak = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id`, {
+    headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
+    cache: "no-store",
+  });
+  if (!semak.ok) throw skemaRalat({ message: await semak.text() });
+  const tinggal = (await semak.json()) as { id?: string }[];
+  if (tinggal.length) {
+    throw new Error("Rekod RPH tidak dapat dipadam daripada pangkalan data.");
+  }
+}
+
+export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
+  const auth = kunciPadam(kunci);
+  if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
+  const bersih = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (!bersih.length) return 0;
+
+  for (let i = 0; i < bersih.length; i += 50) {
+    await padamId(auth, bersih.slice(i, i + 50));
+  }
+
+  const tinggal: string[] = [];
+  for (let i = 0; i < bersih.length; i += 50) {
+    const bahagian = bersih.slice(i, i + 50);
+    const semak = await fetch(`${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})&select=id`, {
+      headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
+      cache: "no-store",
+    });
+    if (!semak.ok) throw skemaRalat({ message: await semak.text() });
+    const data = (await semak.json()) as { id?: string }[];
+    tinggal.push(...data.map((row) => String(row.id)).filter(Boolean));
+  }
+  if (tinggal.length) {
+    throw new Error(`${tinggal.length} rekod RPH tidak dapat dipadam daripada pangkalan data.`);
+  }
+  return bersih.length;
 }
 
 export async function padamSemuaRph(kunci?: KunciSupabase) {

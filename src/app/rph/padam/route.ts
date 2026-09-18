@@ -15,7 +15,12 @@ function keRph(request: Request, query: string) {
 async function padamDanPergi(request: Request) {
   try {
     const cfg = await kunciServisSupabase();
-    if (!cfg.url || !cfg.key) return keRph(request, "padam=kunci");
+    if (!cfg.url || !cfg.key) {
+      return keRph(
+        request,
+        `padam=kunci&m=${encodeURIComponent("Padam RPH memerlukan kunci servis Supabase.")}`
+      );
+    }
     await padamSemuaRph(cfg);
     const baki = await bilanganSemuaRph(cfg);
     revalidatePath("/rph");

@@ -1,10 +1,13 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
-import { getKurikulum, senaraiRph, simpanRph } from "@/lib/rph/save";
+import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
+import { getKurikulum, padamRphPukal, senaraiRph, simpanRph } from "@/lib/rph/save";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   await connection();
@@ -51,6 +54,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: result.id });
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal menyimpan RPH.";
+    return NextResponse.json({ ralat: mesej }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    await connection();
+    const body = (await request.json().catch(() => ({}))) as { ids?: unknown };
+    const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id).trim()).filter(Boolean) : [];
+    if (!ids.length) {
+      return NextResponse.json({ ralat: "Pilih sekurang-kurangnya satu rekod RPH." }, { status: 400 });
+    }
+    const cfg = await kunciServisSupabase();
+    if (!cfg.url || !cfg.key) {
+      return NextResponse.json(
+        { ralat: "Padam RPH memerlukan kunci servis Supabase." },
+        { status: 500 }
+      );
+    }
+    const bil = await padamRphPukal(ids, cfg);
+    return NextResponse.json({ ok: true, bil }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const mesej = error instanceof Error ? error.message : "Gagal memadam RPH.";
     return NextResponse.json({ ralat: mesej }, { status: 500 });
   }
 }
