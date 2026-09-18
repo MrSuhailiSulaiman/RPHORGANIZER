@@ -139,7 +139,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
               {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
               {sedangJana ? "Menjana RPH..." : "Generate RPH"}
             </Button>
-            <BorangPadamRph disabled={sedangJana} />
+            <BorangPadamRph />
           </CardContent>
         </Card>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -173,7 +173,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
-          <BorangPadamRph disabled={sedangJana} />
+          <BorangPadamRph />
         </CardContent>
       </Card>
 

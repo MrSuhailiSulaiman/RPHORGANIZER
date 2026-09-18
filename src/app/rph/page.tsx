@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { CalendarClock, Trash2 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { CalendarClock } from "lucide-react";
+import { BorangPadamRph } from "@/components/borang-padam-rph";
+import { Button } from "@/components/ui/button";
 import { SenaraiRph } from "@/components/senarai-rph";
-import { cn } from "cn";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,12 +32,7 @@ export default async function RphPage({
           <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
-          <form action="/rph/padam" method="post">
-            <button type="submit" className={cn(buttonVariants({ variant: "destructive" }))}>
-              <Trash2 />
-              Padam RPH setahun
-            </button>
-          </form>
+          <BorangPadamRph />
         </div>
       </div>
       {padam === "ok" ? (
