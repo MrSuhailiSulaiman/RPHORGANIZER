@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
     }
     await padamSemuaRph(cfg);
     const baki = await bilanganSemuaRph(cfg);
+    revalidatePath("/rph");
+    revalidatePath("/api/rph");
     if (baki > 0) return keRph(request, `padam=baki&n=${baki}`);
     return keRph(request, "padam=ok");
   } catch {

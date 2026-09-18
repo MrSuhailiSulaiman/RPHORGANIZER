@@ -323,6 +323,15 @@ export async function padamSemuaRph(kunci?: KunciSupabase) {
   const sebelum = await senaraiSemuaIdRph(auth);
   if (!sebelum.length) return 0;
 
+  try {
+    const supabase = createAdminClient();
+    await supabase.from("rph").delete().not("id", "is", null);
+    const selepasSdk = await senaraiSemuaIdRph(auth);
+    if (!selepasSdk.length) return sebelum.length;
+  } catch {
+    // Teruskan padam melalui REST.
+  }
+
   for (let cubaan = 0; cubaan < 6; cubaan += 1) {
     await padamSemuaBaris(auth);
     let ids = await senaraiSemuaIdRph(auth);

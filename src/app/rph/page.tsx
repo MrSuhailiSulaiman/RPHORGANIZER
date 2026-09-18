@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { CalendarClock, Trash2 } from "lucide-react";
+import { CalendarClock } from "lucide-react";
+import { BorangPadamRph } from "@/components/borang-padam-rph";
 import { Button } from "@/components/ui/button";
 import { SenaraiRph } from "@/components/senarai-rph";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function RphPage({
   searchParams,
@@ -30,17 +32,12 @@ export default async function RphPage({
           <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
-          <form action="/rph/padam" method="post">
-            <Button type="submit" variant="destructive">
-              <Trash2 />
-              Padam RPH setahun
-            </Button>
-          </form>
+          <BorangPadamRph />
         </div>
       </div>
       {padam === "ok" ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-          Semua rekod RPH telah dipadam daripada Supabase. Jadual waktu di bawah tidak dipadam.
+          Semua rekod dalam jadual rph telah dipadam. Jadual waktu di bawah tidak dipadam.
         </p>
       ) : null}
       {padam === "gagal" || padam === "kunci" ? (

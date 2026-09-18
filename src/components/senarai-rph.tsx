@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ClipboardList, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { BorangPadamRph } from "@/components/borang-padam-rph";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,16 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
 
   useEffect(() => {
     let hidup = true;
+    if (padamBerjaya) {
+      setRph([]);
+      toast.success("Semua rekod dalam jadual rph telah dipadam.");
+    }
     muat()
+      .then((senarai) => {
+        if (!hidup) return;
+        if (padamBerjaya) setRph([]);
+        else setRph(senarai);
+      })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Gagal memuatkan."))
       .finally(() => {
         if (hidup) setSedangMuat(false);
@@ -46,7 +56,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
     return () => {
       hidup = false;
     };
-  }, []);
+  }, [padamBerjaya]);
 
   const kumpulan = useMemo(
     () =>
@@ -112,17 +122,33 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
     }
   }
 
-  useEffect(() => {
-    if (!padamBerjaya) return;
-    setRph([]);
-    toast.success("Semua RPH telah dipadam daripada Supabase.");
-  }, [padamBerjaya]);
-
   if (sedangMuat) {
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Memuatkan sesi PdP...
-      </p>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Jana RPH setahun</CardTitle>
+            <CardDescription>
+              Gemini menyusun setiap sesi PdP mengikut urutan DSKP, kemudian menulis objektif, BBM, nilai,
+              dan aktiviti untuk 40 minggu persekolahan.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-end gap-3">
+            <label className="space-y-1 text-sm">
+              <span className="text-muted-foreground">Tarikh mula (Isnin)</span>
+              <Input type="date" value={tarikhMula} disabled className="w-44" />
+            </label>
+            <Button type="button" disabled>
+              <Loader2 className="animate-spin" />
+              Memuatkan...
+            </Button>
+            <BorangPadamRph />
+          </CardContent>
+        </Card>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Memuatkan sesi PdP...
+        </p>
+      </div>
     );
   }
 
@@ -150,12 +176,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
-          <form action="/rph/padam" method="post">
-            <Button type="submit" variant="destructive" disabled={sedangJana}>
-              <Trash2 />
-              Padam RPH setahun
-            </Button>
-          </form>
+          <BorangPadamRph disabled={sedangJana} />
         </CardContent>
       </Card>
 
