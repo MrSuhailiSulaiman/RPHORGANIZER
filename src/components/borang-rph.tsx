@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -108,6 +108,8 @@ export function BorangRph({
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangPadam, setSedangPadam] = useState(false);
   const [sedangJana, setSedangJana] = useState(false);
+  const janaMasa = useRef(0);
+  const janaTunda = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let hidup = true;
@@ -147,6 +149,12 @@ export function BorangRph({
       hidup = false;
     };
   }, [rphId, sesiId]);
+
+  useEffect(() => {
+    return () => {
+      if (janaTunda.current) clearTimeout(janaTunda.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!borang.mata_pelajaran) {
@@ -197,20 +205,18 @@ export function BorangRph({
   }
 
   function togolSp(sp: RphStandard, checked: boolean) {
-    setBorang((current) => {
-      const next = checked
-        ? [...current.standard_pembelajaran.filter((item) => item.kod !== sp.kod), sp]
-        : current.standard_pembelajaran.filter((item) => item.kod !== sp.kod);
-      const objektif = next.map((item) => {
-        const pernyataan = item.pernyataan.replace(/^[A-Z]/, (huruf) => huruf.toLowerCase());
-        return `Murid dapat ${pernyataan}`;
-      });
-      return {
-        ...current,
-        standard_pembelajaran: next,
-        objektif: objektif.length ? objektif : current.objektif,
-      };
-    });
+    const next = checked
+      ? [...borang.standard_pembelajaran.filter((item) => item.kod !== sp.kod), sp]
+      : borang.standard_pembelajaran.filter((item) => item.kod !== sp.kod);
+    setBorang((current) => ({
+      ...current,
+      standard_pembelajaran: next,
+    }));
+    if (janaTunda.current) clearTimeout(janaTunda.current);
+    if (!next.length) return;
+    janaTunda.current = setTimeout(() => {
+      void janaSesi({ standard: next, skop: "objektif" });
+    }, 500);
   }
 
   async function simpan() {
@@ -255,13 +261,16 @@ export function BorangRph({
     }
   }
 
-  async function janaSesi() {
-    if (sedangJana) return;
-    const standard = borang.standard_pembelajaran.filter((item) => item.pernyataan.trim());
+  async function janaSesi(pilihan?: { standard?: RphStandard[]; skop?: "objektif" | "penuh" }) {
+    const standard = (pilihan?.standard ?? borang.standard_pembelajaran).filter((item) =>
+      item.pernyataan.trim()
+    );
     if (!standard.length) {
       toast.error("Pilih standard pembelajaran dahulu.");
       return;
     }
+    const skop = pilihan?.skop ?? "penuh";
+    const masa = ++janaMasa.current;
     setSedangJana(true);
     try {
       const res = await fetch("/api/rph/generate-sesi", {
@@ -278,6 +287,7 @@ export function BorangRph({
           sk_kod: borang.sk_kod,
           sk_tajuk: borang.sk_tajuk,
           standard_pembelajaran: standard,
+          skop,
         }),
       });
       const json = (await res.json().catch(() => ({}))) as {
@@ -287,19 +297,29 @@ export function BorangRph({
         bbm?: string;
         nilai?: string;
       };
+      if (masa !== janaMasa.current) return;
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana RPH sesi.");
       setBorang((current) => ({
         ...current,
         objektif: json.objektif?.length ? json.objektif : current.objektif,
-        aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti,
-        bbm: json.bbm?.trim() ? json.bbm : current.bbm,
-        nilai: json.nilai?.trim() ? json.nilai : current.nilai,
+        ...(skop === "penuh"
+          ? {
+              aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti,
+              bbm: json.bbm?.trim() ? json.bbm : current.bbm,
+              nilai: json.nilai?.trim() ? json.nilai : current.nilai,
+            }
+          : {}),
       }));
-      toast.success("Objektif dan aktiviti berpusatkan murid telah dijana. Semak kemudian simpan.");
+      toast.success(
+        skop === "objektif"
+          ? "Objektif dijana daripada standard pembelajaran. Semak, atau Generate RPH untuk aktiviti."
+          : "Objektif dan aktiviti berpusatkan murid telah dijana. Semak kemudian simpan."
+      );
     } catch (error) {
+      if (masa !== janaMasa.current) return;
       toast.error(error instanceof Error ? error.message : "Gagal menjana RPH sesi.");
     } finally {
-      setSedangJana(false);
+      if (masa === janaMasa.current) setSedangJana(false);
     }
   }
 
@@ -489,6 +509,12 @@ export function BorangRph({
             <tr>
               <th className={labelCell}>Objektif pembelajaran</th>
               <td className={`${cell} space-y-2`} colSpan={5}>
+                {sedangJana ? (
+                  <p className="flex items-center gap-2 text-xs text-slate-500">
+                    <Loader2 className="size-3 animate-spin" />
+                    Gemini sedang menganalisis standard pembelajaran...
+                  </p>
+                ) : null}
                 {borang.objektif.map((item, index) => (
                   <Textarea
                     key={index}

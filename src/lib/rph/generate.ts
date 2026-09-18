@@ -28,13 +28,22 @@ const ayatObjektifSesi = z
   .string()
   .min(130)
   .max(500)
-  .regex(/\d/, "Objektif mesti ada nombor yang boleh diukur, contoh 3 atau 4");
+  .refine((ayat) => (ayat.match(/\d+/g) ?? []).length >= 2, {
+    message: "Objektif mesti ada sekurang-kurangnya dua nombor yang boleh diukur",
+  })
+  .refine((ayat) => !/^Murid dapat menerangkan [^0-9]+$/i.test(ayat.trim()), {
+    message: "Jangan salin ayat standard pembelajaran",
+  });
 
 const sesiSchema = z.object({
   objektif: z.array(ayatObjektifSesi).min(2).max(3),
   bbm: z.string(),
   nilai: z.string(),
   aktiviti: z.array(z.string()).min(5).max(8),
+});
+
+const objektifSahajaSchema = z.object({
+  objektif: z.array(ayatObjektifSesi).min(2).max(3),
 });
 
 const GEMINI_MODELS = [
@@ -59,12 +68,12 @@ async function janaObjek<T>(schema: z.ZodType<T>, prompt: string): Promise<T> {
   let last: unknown;
   for (const nama of GEMINI_MODELS) {
     try {
-        const { output } = await generateText({
-          model: googleModel(nama),
-          output: Output.object({ schema }),
-          prompt,
-          maxRetries: 1,
-        });
+      const { output } = await generateText({
+        model: googleModel(nama),
+        output: Output.object({ schema }),
+        prompt,
+        maxRetries: 1,
+      });
       if (output) return output;
     } catch (error) {
       last = error;
@@ -75,7 +84,38 @@ async function janaObjek<T>(schema: z.ZodType<T>, prompt: string): Promise<T> {
   throw last instanceof Error ? last : new Error("Gemini gagal menjana kandungan RPH.");
 }
 
-export async function janaBahanSesi(input: {
+export function hasGeminiKey() {
+  return Boolean(geminiApiKey());
+}
+
+function senaraiSp(sp: { kod: string; pernyataan: string }[]) {
+  return sp.map((item) => `- ${item.kod} ${item.pernyataan}`.trim()).join("\n");
+}
+
+function arahanObjektifDaripadaSp() {
+  return `LANGKAH 1 — ANALISIS setiap Standard Pembelajaran. Jangan salin ayatnya.
+Untuk setiap SP pecahkan: kod, kata kerja DSKP, konsep yang mesti dikuasai, dan bukti yang boleh dikira dalam SATU sesi PdP.
+
+LANGKAH 2 — TULIS 2-3 objektif yang MENGOPERASIKAN hasil analisis itu.
+Setiap objektif SATU ayat panjang bermula "Murid dapat ...".
+
+DILARANG:
+- "Murid dapat " diikuti ayat Standard Pembelajaran (contoh dilarang: "Murid dapat menerangkan keperluan penyelesaian masalah berstrategi").
+- Kata kerja kabur: memahami, mengetahui, menghayati, menyedari, menghargai.
+- Perkataan: beberapa, pelbagai, sesuai.
+
+WAJIB dalam SETIAP objektif — sekurang-kurangnya DUA nombor Arab yang guru boleh semak ya/tidak:
+- menyenaraikan → berapa perkara (contoh 4) + berapa senario/justifikasi
+- membandingkan → berapa perbezaan (contoh 3) + masa atau bilangan hujah
+- menulis/menghasilkan → berapa langkah/ayat + kriteria ketepatan
+- membentangkan → berapa isi atau berapa minit
+
+GAYA YANG WAJIB DIIKUTI (isi mengikut SP yang dianalisis):
+"Murid dapat menyenaraikan 4 keperluan … berdasarkan 1 senario … dengan 2 justifikasi yang tepat."
+"Murid dapat membandingkan 3 perbezaan … dalam masa 10 minit, dengan sekurang-kurangnya 2 hujah yang logik."`;
+}
+
+type KonteksSesi = {
   mata_pelajaran: string;
   tingkatan: string;
   kelas: string;
@@ -85,16 +125,17 @@ export async function janaBahanSesi(input: {
   sk_kod: string;
   sk_tajuk: string;
   standard_pembelajaran: { kod: string; pernyataan: string }[];
-}): Promise<BahanRph> {
-  const sp = input.standard_pembelajaran.filter((item) => item.pernyataan.trim());
-  if (!sp.length) {
-    throw new Error("Pilih standard pembelajaran dahulu.");
-  }
-  if (!hasGeminiKey()) {
-    throw new Error("Kunci Gemini belum dikonfigurasi.");
-  }
+};
 
-  const output = await janaObjek(sesiSchema, `Anda guru pakar KSSM Malaysia. Tulis kandungan RPH untuk SATU sesi PdP dalam bahasa Melayu standard sekolah.
+function tapisSp(input: KonteksSesi) {
+  const sp = input.standard_pembelajaran.filter((item) => item.pernyataan.trim());
+  if (!sp.length) throw new Error("Pilih standard pembelajaran dahulu.");
+  if (!hasGeminiKey()) throw new Error("Kunci Gemini belum dikonfigurasi.");
+  return sp;
+}
+
+function promptKonteksSesi(input: KonteksSesi, sp: { kod: string; pernyataan: string }[]) {
+  return `Anda guru pakar KSSM Malaysia. Tulis dalam bahasa Melayu standard sekolah.
 
 Konteks sesi:
 - Mata pelajaran: ${input.mata_pelajaran || "-"}
@@ -105,31 +146,38 @@ Konteks sesi:
 - Bidang pembelajaran: ${input.bidang_nama || "-"}
 - Standard kandungan: ${[input.sk_kod, input.sk_tajuk].filter(Boolean).join(" ") || "-"}
 
-Standard Pembelajaran yang MESTI diikuti (jangan cipta kod baharu):
-${sp.map((item) => `- ${item.kod} ${item.pernyataan}`.trim()).join("\n")}
+Standard Pembelajaran yang mesti dianalisis (jangan cipta kod baharu):
+${senaraiSp(sp)}
 
-Tugas:
-1. objektif: 2-3 objektif yang SANGAT TERPERINCI dan BOLEH DIUKUR DENGAN JELAS. Setiap objektif SATU ayat panjang bermula "Murid dapat ...".
-   WAJIB dalam SETIAP objektif:
-   - Kata kerja yang boleh dilihat (menyenaraikan, menulis, menghasilkan, membentangkan, membandingkan, menyelesaikan, mengkategori). JANGAN: memahami, mengetahui, menghayati, menyedari, menghargai, menerangkan tanpa nombor.
-   - NOMBOR ARAB yang spesifik (2, 3, 4, 5...). Jangan guna "beberapa", "pelbagai", atau "sesuai".
-     * menyenaraikan → nyatakan BERAPA perkara (contoh: 4 keperluan).
-     * menulis / menghasilkan → berapa ayat, langkah, atau item.
-     * membentangkan → berapa isi utama atau berapa minit.
-     * membandingkan → berapa persamaan atau perbezaan.
-     * menyelesaikan → berapa senario dan berapa langkah, dalam berapa minit jika sesuai.
-   - Kondisi: senario/bahan/cara kerja (contoh: pada lembaran kerja individu berdasarkan senario ralat atur cara).
-   - Kriteria lulus yang guru boleh semak ya/tidak dalam sesi ini.
-   Padankan dengan Standard Pembelajaran. Jangan salin ayat SP secara verbatim.
-   CONTOH BAIK: "Murid dapat menyenaraikan 4 keperluan penyelesaian masalah berstrategi (memahami masalah, merancang langkah, melaksanakan, dan menguji) secara bertulis pada lembaran kerja individu berdasarkan 1 senario ralat atur cara yang diberi, dengan 2 justifikasi yang tepat tanpa merujuk nota."
-   CONTOH BAIK: "Murid dapat menulis 5 langkah proses penyelesaian masalah berurutan pada peta i-Think berkumpulan dalam masa 10 minit, dan setiap langkah dinilai tepat oleh guru."
-   CONTOH LEMAH (dilarang): "Murid dapat menyenaraikan keperluan penyelesaian masalah berstrategi."
-   CONTOH LEMAH (dilarang): "Murid dapat menerangkan keperluan penyelesaian masalah berstrategi."
-2. aktiviti: 5-8 langkah PdP yang TERPERINCI dan BERPUSATKAN MURID. Murid yang aktif (meneroka, berbincang, menyelesai masalah, menghasilkan tugasan, mempersembah). Guru sebagai fasilitator, bukan syarahan panjang. Setiap langkah 1-3 ayat: apa murid buat, bagaimana, dan hasil yang dijangka. Susunan: set induksi, aktiviti utama murid, semakan pembelajaran, penutup. Aktiviti mesti membolehkan guru mengukur objektif (contoh: kira sama ada murid berjaya senaraikan 4 perkara).
-3. bbm: bahan yang realistik di sekolah Malaysia, menyokong aktiviti murid.
+${arahanObjektifDaripadaSp()}`;
+}
+
+export async function janaObjektifSesi(input: KonteksSesi): Promise<string[]> {
+  const sp = tapisSp(input);
+  const output = await janaObjek(
+    objektifSahajaSchema,
+    `${promptKonteksSesi(input, sp)}
+
+Hasilkan HANYA medan objektif. Setiap objektif mesti lahir daripada analisis SP di atas, bukan salinan ayat SP.`
+  );
+  if (!output?.objektif?.length) throw new Error("Gemini tidak menghasilkan objektif.");
+  return output.objektif.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+}
+
+export async function janaBahanSesi(input: KonteksSesi): Promise<BahanRph> {
+  const sp = tapisSp(input);
+  const output = await janaObjek(
+    sesiSchema,
+    `${promptKonteksSesi(input, sp)}
+
+Tugas tambahan:
+1. objektif: ikut arahan analisis di atas.
+2. aktiviti: 5-8 langkah PdP TERPERINCI dan BERPUSATKAN MURID yang membolehkan guru mengukur objektif (contoh: kira sama ada murid berjaya senaraikan 4 perkara). Guru sebagai fasilitator. Susunan: set induksi, aktiviti utama murid, semakan pembelajaran, penutup.
+3. bbm: bahan realistik di sekolah Malaysia.
 4. nilai: satu nilai murni KSSM (contoh PEMIKIR, PRIHATIN, AMANAH).
 
-Jangan ulang ayat standard pembelajaran secara verbatim sebagai aktiviti. Aktiviti mesti sesuai dengan objektif yang anda tulis.`);
+Jangan ulang ayat standard pembelajaran sebagai aktiviti.`
+  );
 
   if (!output) throw new Error("Gemini tidak menghasilkan objektif dan aktiviti.");
   return {
@@ -138,10 +186,6 @@ Jangan ulang ayat standard pembelajaran secara verbatim sebagai aktiviti. Aktivi
     nilai: (output.nilai || "PEMIKIR").trim(),
     aktiviti: output.aktiviti.map((item) => item.trim()).filter(Boolean).slice(0, 8),
   };
-}
-
-export function hasGeminiKey() {
-  return Boolean(geminiApiKey());
 }
 
 function bahanAsal(unit: UnitKurikulum): BahanRph {

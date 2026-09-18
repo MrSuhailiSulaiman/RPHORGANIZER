@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
-import { janaBahanSesi } from "@/lib/rph/generate";
+import { janaBahanSesi, janaObjektifSesi } from "@/lib/rph/generate";
 import { geminiApiKey } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       bidang_nama?: string;
       sk_kod?: string;
       sk_tajuk?: string;
+      skop?: string;
       standard_pembelajaran?: { kod?: string; pernyataan?: string }[];
     };
 
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const bahan = await janaBahanSesi({
+    const konteks = {
       mata_pelajaran: String(body.mata_pelajaran ?? "").trim(),
       tingkatan: String(body.tingkatan ?? "").trim(),
       kelas: String(body.kelas ?? "").trim(),
@@ -65,7 +66,14 @@ export async function POST(request: Request) {
       sk_kod: String(body.sk_kod ?? "").trim(),
       sk_tajuk: String(body.sk_tajuk ?? "").trim(),
       standard_pembelajaran: standard,
-    });
+    };
+
+    if (String(body.skop ?? "").trim() === "objektif") {
+      const objektif = await janaObjektifSesi(konteks);
+      return NextResponse.json({ objektif }, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    const bahan = await janaBahanSesi(konteks);
 
     return NextResponse.json(bahan, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
