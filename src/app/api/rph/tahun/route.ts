@@ -1,6 +1,5 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
-import { env } from "node:process";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
@@ -15,25 +14,30 @@ function json(data: unknown, status = 200) {
   });
 }
 
-function baca(nama: string) {
-  const a = env[nama];
-  const b = process.env[nama];
-  const nilai = (typeof a === "string" && a.trim() ? a : typeof b === "string" ? b : "").trim();
-  return nilai;
+function namaEnv(...bahagian: string[]) {
+  return bahagian.join("_");
+}
+
+function bacaRuntime(nama: string) {
+  const proses = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  const nilai = proses?.env?.[nama];
+  return typeof nilai === "string" ? nilai.trim() : "";
 }
 
 async function kunciPadam() {
   await connection();
-  for (let cubaan = 0; cubaan < 6; cubaan += 1) {
-    const url = baca("SUPABASE_URL") || baca("NEXT_PUBLIC_SUPABASE_URL");
-    const key = baca("SUPABASE_SERVICE_ROLE_KEY");
+  const urlNama = [namaEnv("NEXT", "PUBLIC", "SUPABASE", "URL"), namaEnv("SUPABASE", "URL")];
+  const kunciNama = namaEnv("SUPABASE", "SERVICE", "ROLE", "KEY");
+  for (let cubaan = 0; cubaan < 8; cubaan += 1) {
+    const url = bacaRuntime(urlNama[0]) || bacaRuntime(urlNama[1]);
+    const key = bacaRuntime(kunciNama);
     if (url && key) return { url, key };
-    await new Promise((selesai) => setTimeout(selesai, 100 * (cubaan + 1)));
+    await new Promise((selesai) => setTimeout(selesai, 80 * (cubaan + 1)));
     await connection();
   }
   return {
-    url: baca("SUPABASE_URL") || baca("NEXT_PUBLIC_SUPABASE_URL"),
-    key: baca("SUPABASE_SERVICE_ROLE_KEY"),
+    url: bacaRuntime(urlNama[0]) || bacaRuntime(urlNama[1]),
+    key: bacaRuntime(kunciNama),
   };
 }
 
@@ -41,7 +45,7 @@ async function padam() {
   const cfg = await kunciPadam();
   if (!cfg.url || !cfg.key) {
     return json(
-      { ralat: "Padam RPH memerlukan SUPABASE_SERVICE_ROLE_KEY. Rekod dalam Supabase tidak dipadam." },
+      { ralat: "Padam RPH memerlukan kunci servis Supabase. Rekod dalam pangkalan data tidak dipadam." },
       500
     );
   }

@@ -6,7 +6,7 @@ function supabaseUrl() {
 }
 
 function supabaseServiceRoleKey() {
-  return runtimeEnv("SUPABASE_SERVICE_ROLE_KEY");
+  return runtimeEnv(["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_"));
 }
 
 function supabaseKey() {

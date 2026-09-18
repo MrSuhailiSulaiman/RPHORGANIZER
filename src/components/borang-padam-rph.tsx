@@ -6,6 +6,25 @@ import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "cn";
 
+function posPadam(): Promise<{ ok: boolean; json: { ralat?: string; bil_rph?: number; baki?: number } }> {
+  return new Promise((selesai, gagal) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${window.location.origin}/api/rph/tahun?t=${Date.now()}`);
+    xhr.setRequestHeader("Cache-Control", "no-store");
+    xhr.onload = () => {
+      let json: { ralat?: string; bil_rph?: number; baki?: number } = {};
+      try {
+        json = JSON.parse(xhr.responseText) as typeof json;
+      } catch {
+        json = {};
+      }
+      selesai({ ok: xhr.status >= 200 && xhr.status < 300, json });
+    };
+    xhr.onerror = () => gagal(new Error("Rangkaian gagal semasa memadam RPH."));
+    xhr.send();
+  });
+}
+
 export function BorangPadamRph() {
   const [pending, setPending] = useState(false);
 
@@ -13,26 +32,19 @@ export function BorangPadamRph() {
     if (pending) return;
     setPending(true);
     try {
-      let json: { ralat?: string; bil_rph?: number; baki?: number } = {};
-      let res: Response | null = null;
+      let hasil: { ok: boolean; json: { ralat?: string; bil_rph?: number; baki?: number } } = {
+        ok: false,
+        json: {},
+      };
       for (let cubaan = 0; cubaan < 5; cubaan += 1) {
-        res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Cache-Control": "no-store" },
-        });
-        json = (await res.json().catch(() => ({}))) as {
-          ralat?: string;
-          bil_rph?: number;
-          baki?: number;
-        };
-        if (res.ok && !(json.baki ?? 0)) break;
-        if (cubaan < 4) await new Promise((selesai) => setTimeout(selesai, 300 * (cubaan + 1)));
+        hasil = await posPadam();
+        if (hasil.ok && !(hasil.json.baki ?? 0)) break;
+        if (cubaan < 4) await new Promise((tunggu) => setTimeout(tunggu, 300 * (cubaan + 1)));
       }
-      if (!res?.ok || (json.baki ?? 0) > 0) {
-        throw new Error(json.ralat ?? "Gagal memadam rekod RPH dalam Supabase.");
+      if (!hasil.ok || (hasil.json.baki ?? 0) > 0) {
+        throw new Error(hasil.json.ralat ?? "Gagal memadam rekod RPH dalam Supabase.");
       }
-      toast.success(`${json.bil_rph ?? 0} rekod jadual rph telah dipadam.`);
+      toast.success(`${hasil.json.bil_rph ?? 0} rekod jadual rph telah dipadam.`);
       window.location.assign("/rph?padam=ok");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");

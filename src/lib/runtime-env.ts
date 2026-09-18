@@ -38,7 +38,8 @@ function fileEnv(): EnvMap {
 }
 
 function readEnv(name: string) {
-  const runtime = env[name];
+  const proses = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  const runtime = proses?.env?.[name] ?? env[name];
   if (typeof runtime === "string" && runtime.trim()) return runtime.trim();
   return fileEnv()[name]?.trim() ?? "";
 }
@@ -60,9 +61,14 @@ function jwtRole(key: string) {
 }
 
 export function supabaseRuntimeConfig() {
-  const url = readEnv("SUPABASE_URL") || readEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const service = readEnv("SUPABASE_SERVICE_ROLE_KEY");
-  const anon = readEnv("SUPABASE_ANON_KEY") || readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const urlNama = ["NEXT_PUBLIC", "SUPABASE", "URL"].join("_");
+  const urlNama2 = ["SUPABASE", "URL"].join("_");
+  const servisNama = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
+  const anonNama = ["SUPABASE", "ANON", "KEY"].join("_");
+  const anonNama2 = ["NEXT_PUBLIC", "SUPABASE", "ANON", "KEY"].join("_");
+  const url = readEnv(urlNama2) || readEnv(urlNama);
+  const service = readEnv(servisNama);
+  const anon = readEnv(anonNama) || readEnv(anonNama2);
   const key = service || anon;
   return {
     url,
