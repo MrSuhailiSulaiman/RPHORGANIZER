@@ -1,5 +1,5 @@
-import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { janaBahanSesi, janaObjektifSesi } from "@/lib/rph/generate";
 import { geminiApiKey } from "@/lib/runtime-env";
 
@@ -8,19 +8,11 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const maxDuration = 90;
 
-function kunciGeminiSedia() {
-  return Boolean(
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
-      process.env.GEMINI_API_KEY?.trim() ||
-      geminiApiKey()
-  );
-}
-
 export async function POST(request: Request) {
   try {
-    await connection();
+    const kunci = await kunciGemini();
     geminiApiKey();
-    if (!kunciGeminiSedia()) {
+    if (!kunci) {
       return NextResponse.json(
         { ralat: "Kunci Gemini belum dikonfigurasi. Generate RPH sesi tidak dapat dijalankan." },
         { status: 500 }

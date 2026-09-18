@@ -79,10 +79,15 @@ export function supabaseRuntimeConfig() {
 }
 
 export function geminiApiKey() {
-  const key =
-    readEnv("GOOGLE_GENERATIVE_AI_API_KEY") ||
-    readEnv("GEMINI_API_KEY") ||
-    readEnv("GOOGLE_API_KEY");
-  if (key) env.GOOGLE_GENERATIVE_AI_API_KEY = key;
+  const names = [
+    ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
+    ["GEMINI", "API", "KEY"].join("_"),
+    ["GOOGLE", "API", "KEY"].join("_"),
+  ];
+  const key = names.map((name) => readEnv(name)).find((value) => value) ?? "";
+  if (key) {
+    env[names[0]] = key;
+    env[names[1]] = key;
+  }
   return key;
 }

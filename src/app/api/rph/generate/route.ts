@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { senaraiSesi } from "@/lib/jadual/save";
+import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { janaBahanKurikulum } from "@/lib/rph/generate";
 import { geminiApiKey, supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
@@ -17,18 +18,10 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-function kunciGeminiSedia() {
-  return Boolean(
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
-      process.env.GEMINI_API_KEY?.trim() ||
-      geminiApiKey()
-  );
-}
-
 export async function GET() {
-  await connection();
+  const gemini = Boolean(await kunciGemini());
   return NextResponse.json(
-    { gemini: kunciGeminiSedia() },
+    { gemini },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
@@ -38,13 +31,7 @@ export async function POST(request: Request) {
     await connection();
     geminiApiKey();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
-    const gemini = kunciGeminiSedia();
-    if (!gemini) {
-      console.error("gemini_key_missing", {
-        google: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
-        gemini: Boolean(process.env.GEMINI_API_KEY),
-      });
-    }
+    const gemini = Boolean(await kunciGemini());
 
     const sesi = await senaraiSesi();
     if (!sesi.length) {
