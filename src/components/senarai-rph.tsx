@@ -14,7 +14,13 @@ import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 
-export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean }) {
+export function SenaraiRph({
+  padamBerjaya = false,
+  padamAction,
+}: {
+  padamBerjaya?: boolean;
+  padamAction: string;
+}) {
   const [sesi, setSesi] = useState<SesiPdp[]>([]);
   const [rph, setRph] = useState<RphRekod[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
@@ -139,7 +145,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
               {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
               {sedangJana ? "Menjana RPH..." : "Generate RPH"}
             </Button>
-            <BorangPadamRph />
+            <BorangPadamRph action={padamAction} />
           </CardContent>
         </Card>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -173,7 +179,7 @@ export function SenaraiRph({ padamBerjaya = false }: { padamBerjaya?: boolean })
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
-          <BorangPadamRph />
+          <BorangPadamRph action={padamAction} />
         </CardContent>
       </Card>
 

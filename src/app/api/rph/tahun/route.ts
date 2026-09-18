@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
@@ -14,35 +15,8 @@ function json(data: unknown, status = 200) {
   });
 }
 
-function namaEnv(...bahagian: string[]) {
-  return bahagian.join("_");
-}
-
-function bacaRuntime(nama: string) {
-  const proses = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
-  const nilai = proses?.env?.[nama];
-  return typeof nilai === "string" ? nilai.trim() : "";
-}
-
-async function kunciPadam() {
-  await connection();
-  const urlNama = [namaEnv("NEXT", "PUBLIC", "SUPABASE", "URL"), namaEnv("SUPABASE", "URL")];
-  const kunciNama = namaEnv("SUPABASE", "SERVICE", "ROLE", "KEY");
-  for (let cubaan = 0; cubaan < 8; cubaan += 1) {
-    const url = bacaRuntime(urlNama[0]) || bacaRuntime(urlNama[1]);
-    const key = bacaRuntime(kunciNama);
-    if (url && key) return { url, key };
-    await new Promise((selesai) => setTimeout(selesai, 80 * (cubaan + 1)));
-    await connection();
-  }
-  return {
-    url: bacaRuntime(urlNama[0]) || bacaRuntime(urlNama[1]),
-    key: bacaRuntime(kunciNama),
-  };
-}
-
 async function padam() {
-  const cfg = await kunciPadam();
+  const cfg = await kunciServisSupabase();
   if (!cfg.url || !cfg.key) {
     return json(
       { ralat: "Padam RPH memerlukan kunci servis Supabase. Rekod dalam pangkalan data tidak dipadam." },
@@ -65,7 +39,8 @@ async function padam() {
 }
 
 export async function GET() {
-  const cfg = await kunciPadam();
+  await connection();
+  const cfg = await kunciServisSupabase();
   const bil_rph = await bilanganSemuaRph(cfg);
   return json({
     service_role: Boolean(cfg.key),

@@ -1,8 +1,9 @@
+import { headers } from "next/headers";
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
-import { BorangPadamRph } from "@/components/borang-padam-rph";
-import { Button } from "@/components/ui/button";
+import { CalendarClock, Trash2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SenaraiRph } from "@/components/senarai-rph";
+import { cn } from "cn";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,6 +14,11 @@ export default async function RphPage({
   searchParams: Promise<{ padam?: string; n?: string; m?: string }>;
 }) {
   const { padam, n, m } = await searchParams;
+  const kepala = await headers();
+  const host = kepala.get("x-forwarded-host") ?? kepala.get("host") ?? "rphorganizer.vercel.app";
+  const proto = kepala.get("x-forwarded-proto") ?? "https";
+  const padamAction = `${proto}://${host}/rph/padam`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -32,7 +38,6 @@ export default async function RphPage({
           <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
-          <BorangPadamRph />
         </div>
       </div>
       {padam === "ok" ? (
@@ -50,7 +55,13 @@ export default async function RphPage({
           {n ?? "Beberapa"} rekod RPH masih wujud dalam Supabase.
         </p>
       ) : null}
-      <SenaraiRph padamBerjaya={padam === "ok"} />
+      <form action={padamAction} method="post">
+        <button type="submit" className={cn(buttonVariants({ variant: "destructive", size: "lg" }))}>
+          <Trash2 />
+          Padam RPH setahun
+        </button>
+      </form>
+      <SenaraiRph padamBerjaya={padam === "ok"} padamAction={padamAction} />
     </div>
   );
 }
