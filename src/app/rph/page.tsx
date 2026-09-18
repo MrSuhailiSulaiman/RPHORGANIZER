@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
-import { BorangPadamRph } from "@/components/borang-padam-rph";
-import { Button } from "@/components/ui/button";
+import { CalendarClock, Trash2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SenaraiRph } from "@/components/senarai-rph";
+import { cn } from "cn";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,9 +10,9 @@ export const maxDuration = 60;
 export default async function RphPage({
   searchParams,
 }: {
-  searchParams: Promise<{ padam?: string; n?: string }>;
+  searchParams: Promise<{ padam?: string; n?: string; m?: string }>;
 }) {
-  const { padam, n } = await searchParams;
+  const { padam, n, m } = await searchParams;
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -32,7 +32,12 @@ export default async function RphPage({
           <Button asChild variant="outline">
             <Link href="/rph/baru">Borang kosong</Link>
           </Button>
-          <BorangPadamRph />
+          <form action="/rph/padam" method="post">
+            <button type="submit" className={cn(buttonVariants({ variant: "destructive" }))}>
+              <Trash2 />
+              Padam RPH setahun
+            </button>
+          </form>
         </div>
       </div>
       {padam === "ok" ? (
@@ -42,7 +47,7 @@ export default async function RphPage({
       ) : null}
       {padam === "gagal" || padam === "kunci" ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Gagal memadam rekod RPH dalam Supabase. Cuba lagi.
+          {m ? decodeURIComponent(m) : "Gagal memadam rekod RPH dalam Supabase. Cuba lagi."}
         </p>
       ) : null}
       {padam === "baki" ? (

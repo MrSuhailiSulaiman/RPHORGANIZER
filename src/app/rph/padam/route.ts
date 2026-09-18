@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     revalidatePath("/api/rph");
     if (baki > 0) return keRph(request, `padam=baki&n=${baki}`);
     return keRph(request, "padam=ok");
-  } catch {
-    return keRph(request, "padam=gagal");
+  } catch (error) {
+    const mesej = error instanceof Error ? error.message : "Gagal memadam RPH.";
+    console.error("padam_rph_gagal", mesej);
+    return keRph(request, `padam=gagal&m=${encodeURIComponent(mesej.slice(0, 160))}`);
   }
 }
