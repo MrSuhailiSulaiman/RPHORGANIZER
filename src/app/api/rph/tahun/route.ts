@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { env } from "node:process";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
-import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,16 +15,33 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function padam() {
+function baca(nama: string) {
+  const a = env[nama];
+  const b = process.env[nama];
+  const nilai = (typeof a === "string" && a.trim() ? a : typeof b === "string" ? b : "").trim();
+  return nilai;
+}
+
+async function kunciPadam() {
   await connection();
-  const cfg = supabaseRuntimeConfig();
-  if (!cfg.service || cfg.role !== "service_role") {
+  for (let cubaan = 0; cubaan < 6; cubaan += 1) {
+    const url = baca("SUPABASE_URL") || baca("NEXT_PUBLIC_SUPABASE_URL");
+    const key = baca("SUPABASE_SERVICE_ROLE_KEY");
+    if (url && key) return { url, key };
+    await new Promise((selesai) => setTimeout(selesai, 100 * (cubaan + 1)));
+    await connection();
+  }
+  return {
+    url: baca("SUPABASE_URL") || baca("NEXT_PUBLIC_SUPABASE_URL"),
+    key: baca("SUPABASE_SERVICE_ROLE_KEY"),
+  };
+}
+
+async function padam() {
+  const cfg = await kunciPadam();
+  if (!cfg.url || !cfg.key) {
     return json(
-      {
-        ralat: "Padam RPH memerlukan SUPABASE_SERVICE_ROLE_KEY. Rekod dalam Supabase tidak dipadam.",
-        service_role: cfg.service,
-        role: cfg.role,
-      },
+      { ralat: "Padam RPH memerlukan SUPABASE_SERVICE_ROLE_KEY. Rekod dalam Supabase tidak dipadam." },
       500
     );
   }
@@ -36,19 +53,20 @@ async function padam() {
         ralat: `RPH tidak dapat dipadam daripada pangkalan data. ${baki} rekod termasuk id masih wujud dalam Supabase.`,
         bil_rph: bilangan,
         baki,
-        role: cfg.role,
       },
       500
     );
   }
-  return json({ bil_rph: bilangan, baki: 0, role: cfg.role });
+  return json({ bil_rph: bilangan, baki: 0 });
 }
 
 export async function GET() {
-  await connection();
-  const { service, role } = supabaseRuntimeConfig();
-  const bil_rph = await bilanganSemuaRph();
-  return json({ service_role: service, role, bil_rph });
+  const cfg = await kunciPadam();
+  const bil_rph = await bilanganSemuaRph(cfg);
+  return json({
+    service_role: Boolean(cfg.key),
+    bil_rph,
+  });
 }
 
 export async function DELETE() {

@@ -253,16 +253,6 @@ function kunciPadam(kunci?: KunciSupabase): KunciSupabase {
   return { url: cfg.url, key: cfg.key };
 }
 
-function perananJwt(key: string) {
-  try {
-    return String(
-      JSON.parse(Buffer.from(key.split(".")[1] || "", "base64url").toString()).role ?? ""
-    );
-  } catch {
-    return "";
-  }
-}
-
 function kepalaPadam(key: string) {
   return {
     apikey: key,
@@ -316,9 +306,6 @@ async function padamId(kunci: KunciSupabase, ids: string[]) {
 export async function padamSemuaRph(kunci?: KunciSupabase) {
   const auth = kunciPadam(kunci);
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
-  if (perananJwt(auth.key) !== "service_role") {
-    throw new Error("Padam RPH memerlukan SUPABASE_SERVICE_ROLE_KEY. Rekod dalam Supabase tidak dipadam.");
-  }
 
   const sebelum = await senaraiSemuaIdRph(auth);
   if (!sebelum.length) return 0;

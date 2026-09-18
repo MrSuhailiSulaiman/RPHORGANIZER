@@ -13,17 +13,23 @@ export function BorangPadamRph() {
     if (pending) return;
     setPending(true);
     try {
-      const res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        ralat?: string;
-        bil_rph?: number;
-        baki?: number;
-      };
-      if (!res.ok || (json.baki ?? 0) > 0) {
+      let json: { ralat?: string; bil_rph?: number; baki?: number } = {};
+      let res: Response | null = null;
+      for (let cubaan = 0; cubaan < 5; cubaan += 1) {
+        res = await fetch(`/api/rph/tahun?t=${Date.now()}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
+        json = (await res.json().catch(() => ({}))) as {
+          ralat?: string;
+          bil_rph?: number;
+          baki?: number;
+        };
+        if (res.ok && !(json.baki ?? 0)) break;
+        if (cubaan < 4) await new Promise((selesai) => setTimeout(selesai, 300 * (cubaan + 1)));
+      }
+      if (!res?.ok || (json.baki ?? 0) > 0) {
         throw new Error(json.ralat ?? "Gagal memadam rekod RPH dalam Supabase.");
       }
       toast.success(`${json.bil_rph ?? 0} rekod jadual rph telah dipadam.`);
