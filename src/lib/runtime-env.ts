@@ -37,11 +37,23 @@ function fileEnv(): EnvMap {
   return files.reduce<EnvMap>((all, file) => ({ ...all, ...parseEnvFile(file) }), {});
 }
 
+function semuaEnv(): Record<string, string> {
+  const keluar: Record<string, string> = {};
+  const bag = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  if (bag) {
+    for (const nama of Object.keys(bag)) {
+      const nilai = bag[nama];
+      if (typeof nilai === "string" && nilai.trim()) keluar[nama] = nilai.trim();
+    }
+  }
+  for (const [nama, nilai] of Object.entries(fileEnv())) {
+    if (nilai.trim()) keluar[nama] = nilai.trim();
+  }
+  return keluar;
+}
+
 function readEnv(name: string) {
-  const proses = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
-  const runtime = proses?.env?.[name] ?? env[name];
-  if (typeof runtime === "string" && runtime.trim()) return runtime.trim();
-  return fileEnv()[name]?.trim() ?? "";
+  return semuaEnv()[name] ?? "";
 }
 
 export function runtimeEnv(key: string) {
@@ -79,15 +91,34 @@ export function supabaseRuntimeConfig() {
 }
 
 export function geminiApiKey() {
+  const semua = semuaEnv();
   const names = [
     ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
     ["GEMINI", "API", "KEY"].join("_"),
     ["GOOGLE", "API", "KEY"].join("_"),
   ];
-  const key = names.map((name) => readEnv(name)).find((value) => value) ?? "";
-  if (key) {
-    env[names[0]] = key;
-    env[names[1]] = key;
+  let key = names.map((name) => semua[name]).find((value) => value) ?? "";
+  if (!key) {
+    for (const [nama, nilai] of Object.entries(semua)) {
+      if (/GEMINI.*API.*KEY|GOOGLE.*GENERATIVE.*AI.*API.*KEY/i.test(nama)) {
+        key = nilai;
+        break;
+      }
+    }
   }
+  if (key) tetapkanGeminiEnv(key);
   return key;
+}
+
+export function tetapkanGeminiEnv(key: string) {
+  if (!key) return;
+  const names = [
+    ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
+    ["GEMINI", "API", "KEY"].join("_"),
+  ];
+  const bag = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  for (const nama of names) {
+    env[nama] = key;
+    if (bag) bag[nama] = key;
+  }
 }
