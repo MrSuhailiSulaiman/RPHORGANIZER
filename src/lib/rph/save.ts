@@ -265,7 +265,7 @@ async function senaraiSemuaIdRph(kunci: KunciSupabase) {
   if (!kunci.url || !kunci.key) return [];
   const ids: string[] = [];
   for (let dari = 0; dari < 50000; dari += 1000) {
-    const res = await fetch(`${kunci.url}/rest/v1/rph?select=id&limit=1000&offset=${dari}`, {
+    const res = await fetch(`${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}&limit=1000&offset=${dari}`, {
       headers: { apikey: kunci.key, Authorization: `Bearer ${kunci.key}` },
       cache: "no-store",
     });
@@ -327,13 +327,35 @@ export async function padamRph(id: string, kunci?: KunciSupabase) {
   });
   if (!res.ok) throw skemaRalat({ message: await res.text() });
 
-  const semak = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id`, {
+  const semak = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id,mata_pelajaran`, {
     headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
     cache: "no-store",
   });
   if (!semak.ok) throw skemaRalat({ message: await semak.text() });
-  const tinggal = (await semak.json()) as { id?: string }[];
-  if (tinggal.length) {
+  const tinggal = (await semak.json()) as { id?: string; mata_pelajaran?: string }[];
+  if (!tinggal.length || tinggal.every((row) => row.mata_pelajaran === RPH_PADAM)) return;
+
+  const sorok = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}`, {
+    method: "PATCH",
+    headers: {
+      ...kepalaPadam(auth.key),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mata_pelajaran: RPH_PADAM }),
+    cache: "no-store",
+  });
+  if (!sorok.ok) throw skemaRalat({ message: await sorok.text() });
+
+  const semakSemula = await fetch(
+    `${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id,mata_pelajaran`,
+    {
+      headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
+      cache: "no-store",
+    }
+  );
+  if (!semakSemula.ok) throw skemaRalat({ message: await semakSemula.text() });
+  const baki = (await semakSemula.json()) as { mata_pelajaran?: string }[];
+  if (baki.some((row) => row.mata_pelajaran !== RPH_PADAM)) {
     throw new Error("Rekod RPH tidak dapat dipadam daripada pangkalan data.");
   }
 }
@@ -348,19 +370,35 @@ export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
     await padamId(auth, bersih.slice(i, i + 50));
   }
 
-  const tinggal: string[] = [];
+  const tinggal: { id?: string; mata_pelajaran?: string }[] = [];
   for (let i = 0; i < bersih.length; i += 50) {
     const bahagian = bersih.slice(i, i + 50);
-    const semak = await fetch(`${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})&select=id`, {
-      headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
-      cache: "no-store",
-    });
+    const semak = await fetch(
+      `${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})&select=id,mata_pelajaran`,
+      {
+        headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
+        cache: "no-store",
+      }
+    );
     if (!semak.ok) throw skemaRalat({ message: await semak.text() });
-    const data = (await semak.json()) as { id?: string }[];
-    tinggal.push(...data.map((row) => String(row.id)).filter(Boolean));
+    const data = (await semak.json()) as { id?: string; mata_pelajaran?: string }[];
+    tinggal.push(...data.filter((row) => row.mata_pelajaran !== RPH_PADAM));
   }
   if (tinggal.length) {
-    throw new Error(`${tinggal.length} rekod RPH tidak dapat dipadam daripada pangkalan data.`);
+    const idsTinggal = tinggal.map((row) => String(row.id)).filter(Boolean);
+    for (let i = 0; i < idsTinggal.length; i += 50) {
+      const bahagian = idsTinggal.slice(i, i + 50);
+      const sorok = await fetch(`${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})`, {
+        method: "PATCH",
+        headers: {
+          ...kepalaPadam(auth.key),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mata_pelajaran: RPH_PADAM }),
+        cache: "no-store",
+      });
+      if (!sorok.ok) throw skemaRalat({ message: await sorok.text() });
+    }
   }
   return bersih.length;
 }

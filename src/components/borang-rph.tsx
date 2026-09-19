@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HARI_LIST, tarikhUntukHari } from "@/lib/jadual/parse";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "@/lib/rph/types";
+import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
 import type { SesiPdp } from "@/lib/jadual/types";
 
 type Borang = {
@@ -248,9 +249,7 @@ export function BorangRph({
     if (!borang.id || sedangPadam) return;
     setSedangPadam(true);
     try {
-      const res = await fetch(`/api/rph/${borang.id}`, { method: "DELETE", cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
+      await hantarPadamRph([borang.id]);
       toast.success("Rekod RPH dipadam.");
       router.push("/rph");
       router.refresh();

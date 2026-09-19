@@ -10,7 +10,7 @@ export async function kunciServisSupabase() {
     await connection();
   }
   const cfg = supabaseRuntimeConfig();
-  return { url: cfg.url, key: cfg.service ? cfg.key : "" };
+  return { url: cfg.url, key: cfg.key };
 }
 
 async function kunciGeminiDariSupabase() {

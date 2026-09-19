@@ -12,6 +12,7 @@ import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
 
 export function SenaraiRph() {
   const [sesi, setSesi] = useState<SesiPdp[]>([]);
@@ -91,10 +92,8 @@ export function SenaraiRph() {
     if (padamId) return;
     setPadamId(id);
     try {
-      const res = await fetch(`/api/rph/${id}`, { method: "DELETE", cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
-      setRph((senarai) => senarai.filter((item) => item.id !== id));
+      await hantarPadamRph([id]);
+      await muat();
       setDipilih((senarai) => senarai.filter((item) => item !== id));
       toast.success("Rekod RPH dipadam.");
     } catch (error) {
@@ -120,18 +119,10 @@ export function SenaraiRph() {
     if (!dipilih.length || sedangPukal || padamId) return;
     setSedangPukal(true);
     try {
-      const res = await fetch("/api/rph", {
-        method: "DELETE",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: dipilih }),
-      });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil?: number };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal memadam RPH.");
-      const buang = new Set(dipilih);
-      setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
+      const bil = await hantarPadamRph(dipilih);
+      await muat();
       setDipilih([]);
-      toast.success(`${json.bil ?? buang.size} rekod RPH dipadam.`);
+      toast.success(`${bil} rekod RPH dipadam.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
