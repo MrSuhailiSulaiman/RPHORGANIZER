@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { janaBahanKurikulum } from "@/lib/rph/generate";
-import { geminiApiKey, supabaseRuntimeConfig } from "@/lib/runtime-env";
+import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
   BIL_MINGGU_TAHUN,
@@ -29,9 +29,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await connection();
-    geminiApiKey();
+    await kunciGemini();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
-    const gemini = Boolean(await kunciGemini());
 
     const sesi = await senaraiSesi();
     if (!sesi.length) {
@@ -74,14 +73,19 @@ export async function POST(request: Request) {
         (unit && slot.dokumen_id
           ? bahanMengikutDokumen.get(slot.dokumen_id)?.get(unit.sk_kod)
           : undefined) ?? {
-          objektif: ["Murid dapat mengikuti sesi PdP mengikut jadual."],
-          bbm: "Buku teks, nota guru, komputer",
+          objektif: [
+            "Murid dapat menyatakan 3 contoh isi pelajaran secara bertulis berdasarkan 1 senario yang diberi, dengan 2 justifikasi yang tepat.",
+            "Murid dapat menyenaraikan 4 langkah aktiviti PdP dalam masa 10 minit, kemudian membentangkan sekurang-kurangnya 2 hujah yang logik.",
+          ],
+          bbm: "Buku teks, lembaran kerja, kertas sebak, projektor LCD",
           nilai: "PEMIKIR",
           aktiviti: [
-            "Set induksi.",
-            "Penerangan guru.",
-            "Aktiviti murid.",
-            "Penilaian dan penutup.",
+            "Set induksi: murid meneliti 1 senario dan menyatakan 2 jawapan awal.",
+            "Murid berpasangan menyenaraikan 4 isi pada kertas sebak.",
+            "Kumpulan menyatakan 3 contoh semasa gallery walk selama 8 minit.",
+            "Perwakilan membentangkan 2 hujah manakala rakan memberi maklum balas.",
+            "Murid individu melengkapkan lembaran kerja dengan 3 contoh dan 2 justifikasi.",
+            "Murid menyemak nombor dalam objektif bersama guru sebelum penutup.",
           ],
         };
 

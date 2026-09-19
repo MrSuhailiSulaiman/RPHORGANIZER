@@ -6,7 +6,7 @@
       "includeFiles": "{node_modules/tesseract.js/**,node_modules/tesseract.js-core/**,node_modules/wasm-feature-detect/**,vendor/tessdata/**}"
     },
     "src/app/api/rph/generate/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "src/app/api/rph/tahun/route.ts": {
       "maxDuration": 60

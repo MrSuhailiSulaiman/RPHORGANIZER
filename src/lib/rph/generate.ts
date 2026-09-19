@@ -5,18 +5,6 @@ import { geminiApiKey } from "@/lib/runtime-env";
 import type { KurikulumPilihan } from "./types";
 import { ratakanKurikulum, type UnitKurikulum } from "./tahun";
 
-const bahanSchema = z.object({
-  bahan: z.array(
-    z.object({
-      sk_kod: z.string(),
-      objektif: z.array(z.string().min(80).max(500).regex(/\d/)).min(2).max(3),
-      bbm: z.string(),
-      nilai: z.string(),
-      aktiviti: z.array(z.string()).min(4).max(6),
-    })
-  ),
-});
-
 export type BahanRph = {
   objektif: string[];
   bbm: string;
@@ -35,11 +23,25 @@ const ayatObjektifSesi = z
     message: "Jangan salin ayat standard pembelajaran",
   });
 
+const ayatAktiviti = z.string().min(50).max(500);
+
+const bahanSchema = z.object({
+  bahan: z.array(
+    z.object({
+      sk_kod: z.string(),
+      objektif: z.array(ayatObjektifSesi).min(2).max(3),
+      bbm: z.string(),
+      nilai: z.string(),
+      aktiviti: z.array(ayatAktiviti).min(5).max(8),
+    })
+  ),
+});
+
 const sesiSchema = z.object({
   objektif: z.array(ayatObjektifSesi).min(2).max(3),
   bbm: z.string(),
   nilai: z.string(),
-  aktiviti: z.array(z.string()).min(5).max(8),
+  aktiviti: z.array(ayatAktiviti).min(5).max(8),
 });
 
 const objektifSahajaSchema = z.object({
@@ -105,14 +107,25 @@ DILARANG:
 - Perkataan: beberapa, pelbagai, sesuai.
 
 WAJIB dalam SETIAP objektif — sekurang-kurangnya DUA nombor Arab yang guru boleh semak ya/tidak:
+- menyatakan / memberi contoh → berapa contoh (contoh 3)
 - menyenaraikan → berapa perkara (contoh 4) + berapa senario/justifikasi
 - membandingkan → berapa perbezaan (contoh 3) + masa atau bilangan hujah
 - menulis/menghasilkan → berapa langkah/ayat + kriteria ketepatan
 - membentangkan → berapa isi atau berapa minit
 
 GAYA YANG WAJIB DIIKUTI (isi mengikut SP yang dianalisis):
+"Murid dapat menyatakan 3 contoh … secara lisan/bertulis berdasarkan 1 senario … dengan 2 justifikasi yang tepat."
 "Murid dapat menyenaraikan 4 keperluan … berdasarkan 1 senario … dengan 2 justifikasi yang tepat."
 "Murid dapat membandingkan 3 perbezaan … dalam masa 10 minit, dengan sekurang-kurangnya 2 hujah yang logik."`;
+}
+
+function arahanAktivitiDaripadaObjektif() {
+  return `LANGKAH 3 — TULIS 5-8 aktiviti TERPERINCI yang BERPUSATKAN MURID, berpandukan objektif yang anda tulis.
+Murid yang aktif: meneroka, berbincang, menyatakan contoh, menyenaraikan, menghasilkan, mempersembah, gallery walk.
+Guru sebagai fasilitator, BUKAN syarahan panjang. Dilarang langkah "Guru menerangkan..." sebagai aktiviti utama.
+Setiap langkah 1-3 ayat: apa murid buat, dengan bahan apa, berapa item atau berapa minit, dan hasil yang dijangka.
+Susunan: set induksi, aktiviti utama murid, semakan pembelajaran (semak nombor dalam objektif, contoh 3 contoh / 4 keperluan), penutup.
+Contoh baik: "Murid dalam kumpulan 4 orang menyatakan 3 contoh pada kertas sebak berdasarkan 1 senario, kemudian gallery walk selama 8 minit supaya rakan menambah 2 komen."`;
 }
 
 type KonteksSesi = {
@@ -170,9 +183,11 @@ export async function janaBahanSesi(input: KonteksSesi): Promise<BahanRph> {
     sesiSchema,
     `${promptKonteksSesi(input, sp)}
 
+${arahanAktivitiDaripadaObjektif()}
+
 Tugas tambahan:
 1. objektif: ikut arahan analisis di atas.
-2. aktiviti: 5-8 langkah PdP TERPERINCI dan BERPUSATKAN MURID yang membolehkan guru mengukur objektif (contoh: kira sama ada murid berjaya senaraikan 4 perkara). Guru sebagai fasilitator. Susunan: set induksi, aktiviti utama murid, semakan pembelajaran, penutup.
+2. aktiviti: ikut arahan aktiviti di atas.
 3. bbm: bahan realistik di sekolah Malaysia.
 4. nilai: satu nilai murni KSSM (contoh PEMIKIR, PRIHATIN, AMANAH).
 
@@ -189,21 +204,21 @@ Jangan ulang ayat standard pembelajaran sebagai aktiviti.`
 }
 
 function bahanAsal(unit: UnitKurikulum): BahanRph {
-  const pernyataan = unit.standard_pembelajaran.map((item) => item.pernyataan).join("; ");
+  const konsep = unit.sk_tajuk || unit.sk_kod;
   return {
     objektif: [
-      `Murid dapat menjelaskan ${unit.sk_tajuk.toLowerCase()} berdasarkan standard pembelajaran.`,
-      `Murid dapat melaksanakan aktiviti PdP berkaitan ${unit.sk_kod}.`,
+      `Murid dapat menyatakan 3 contoh berkaitan ${konsep} secara bertulis pada lembaran kerja individu berdasarkan 1 senario yang diberi, dengan 2 justifikasi yang tepat.`,
+      `Murid dapat menyenaraikan 4 isi utama ${konsep} dalam kumpulan dalam masa 10 minit, kemudian membentangkan sekurang-kurangnya 2 hujah yang logik.`,
     ],
-    bbm: "Buku teks, nota guru, komputer, LCD, lembaran kerja",
+    bbm: "Buku teks, lembaran kerja, kertas sebak, pen marker, projektor LCD",
     nilai: "PEMIKIR",
     aktiviti: [
-      `Set induksi: soalan pencetus tentang ${unit.sk_tajuk}.`,
-      `Guru menerangkan ${unit.sk_kod} ${unit.sk_tajuk}.`,
-      `Murid meneliti standard pembelajaran: ${pernyataan.slice(0, 180)}.`,
-      "Aktiviti berkumpulan: bincang dan hasilkan tugasan.",
-      "Persembahan kumpulan dan rumusan guru.",
-      "Penilaian formatif dan penutup.",
+      `Set induksi: murid meneliti 1 senario berkaitan ${konsep} dan menyatakan 2 jawapan awal secara sukarela.`,
+      `Murid berpasangan menyenaraikan 4 isi berkaitan ${konsep} pada kertas sebak berdasarkan senario yang diberi.`,
+      `Setiap kumpulan menyatakan 3 contoh kepada kumpulan lain semasa gallery walk selama 8 minit.`,
+      `Perwakilan kumpulan membentangkan 2 hujah utama di hadapan kelas manakala rakan memberi maklum balas.`,
+      `Murid individu melengkapkan lembaran kerja dengan 3 contoh dan 2 justifikasi tanpa merujuk nota.`,
+      `Murid menyemak semula nombor dalam objektif bersama guru dan membetulkan jawapan sebelum penutup.`,
     ],
   };
 }
@@ -218,27 +233,34 @@ export async function janaBahanKurikulum(kurikulum: KurikulumPilihan) {
     sk_kod: unit.sk_kod,
     sk_tajuk: unit.sk_tajuk,
     bidang: unit.bidang_nama,
-    standard_pembelajaran: unit.standard_pembelajaran.map((item) => `${item.kod} ${item.pernyataan}`),
+    standard_pembelajaran: unit.standard_pembelajaran.map((item) => ({
+      kod: item.kod,
+      pernyataan: item.pernyataan,
+    })),
   }));
 
-  const saiz = 40;
+  const saiz = 4;
   for (let i = 0; i < ringkas.length; i += saiz) {
     const bahagian = ringkas.slice(i, i + saiz);
     try {
       const output = await janaObjek(
         bahanSchema,
-        `Anda guru pakar KSSM Malaysia. Tulis kandungan RPH dalam bahasa Melayu standard sekolah.
+        `Anda guru pakar KSSM Malaysia. Tulis kandungan RPH untuk SETIAP Standard Kandungan dalam bahasa Melayu standard sekolah.
 
 Mata pelajaran: ${kurikulum.mata_pelajaran}
 Tingkatan: ${kurikulum.tingkatan ?? "-"}
 
-Untuk SETIAP Standard Kandungan, hasilkan:
-- objektif: 2-3 ayat TERPERINCI bermula "Murid dapat ..." yang BOLEH DIUKUR DENGAN NOMBOR (contoh: menyenaraikan 4 perkara, menulis 5 langkah). Wajib ada nombor Arab. Bukan "memahami/mengetahui/beberapa". Bukan salinan ayat standard pembelajaran.
-- bbm: bahan bantu mengajar yang realistik di sekolah
-- nilai: satu nilai murni KSSM (contoh PEMIKIR, PRIHATIN, AMANAH)
-- aktiviti: 5-6 langkah PdP (set induksi, penerangan, aktiviti murid, penilaian, penutup)
+Untuk SETIAP sk_kod:
+1. ANALISIS setiap Standard Pembelajaran. Jangan salin ayat SP.
+2. objektif: 2-3 ayat TERPERINCI yang BOLEH DIUKUR, sama kualiti dengan RPH sesi pada halaman Isi RPH.
+3. aktiviti: 5-8 langkah TERPERINCI BERPUSATKAN MURID yang mengukur objektif itu (bukan syarahan guru).
+4. bbm dan nilai.
 
-Ikut Standard Pembelajaran yang diberi. Jangan cipta kod baharu.
+${arahanObjektifDaripadaSp()}
+
+${arahanAktivitiDaripadaObjektif()}
+
+Jangan cipta kod baharu. Padankan sk_kod dengan tepat.
 
 ${JSON.stringify(bahagian, null, 2)}`
       );
@@ -248,7 +270,7 @@ ${JSON.stringify(bahagian, null, 2)}`
           objektif: item.objektif.filter(Boolean).slice(0, 3),
           bbm: item.bbm,
           nilai: item.nilai || "PEMIKIR",
-          aktiviti: item.aktiviti.filter(Boolean).slice(0, 6),
+          aktiviti: item.aktiviti.filter(Boolean).slice(0, 8),
         });
       }
     } catch (error) {
