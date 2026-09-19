@@ -124,6 +124,10 @@ function isSpKod(kod: string) {
   return /^\d+\.\d+\.\d+$/.test(kod);
 }
 
+export function teksKurikulumDskp(text: string) {
+  return contentSection(text);
+}
+
 function contentSection(text: string) {
   const marker = text.search(/STANDARD KANDUNGAN,\s*STANDARD PEMBELAJARAN/i);
   let section = marker >= 0 ? text.slice(marker) : text;

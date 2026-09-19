@@ -49,7 +49,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: result.id });
   } catch (error) {
-    const mesej = error instanceof Error ? error.message : "Gagal menyimpan DSKP.";
+    const mentah = error instanceof Error ? error.message : "";
+    const mesej =
+      !mentah || /pattern|JSON|Unexpected/i.test(mentah)
+        ? "Gagal menyimpan DSKP. Semak hasil analisis dan cuba semula."
+        : mentah;
     return NextResponse.json({ ralat: mesej }, { status: 500 });
   }
 }

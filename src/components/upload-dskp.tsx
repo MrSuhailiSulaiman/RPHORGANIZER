@@ -49,6 +49,25 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
     };
   }, []);
 
+  async function bacaJson(res: Response) {
+    const teks = await res.text();
+    try {
+      return JSON.parse(teks) as {
+        ralat?: string;
+        extract?: DskpExtract;
+        ringkasan?: Ringkasan;
+        jumlahMukaSurat?: number;
+        id?: string;
+      };
+    } catch {
+      throw new Error(
+        res.status === 504 || res.status === 408
+          ? "Permintaan tamat masa. Sila cuba semula."
+          : "Permintaan gagal. Sila cuba semula."
+      );
+    }
+  }
+
   async function analisis() {
     if (!fail) return;
     if ("ralat" in maklumat) {
@@ -61,15 +80,16 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
       const form = new FormData();
       form.append("file", fail);
       const res = await fetch("/api/dskp/analyze", { method: "POST", body: form });
-      const json = await res.json();
+      const json = await bacaJson(res);
       if (!res.ok) throw new Error(json.ralat ?? "Analisis gagal.");
+      if (!json.extract || !json.ringkasan) throw new Error("Hasil analisis tidak lengkap.");
       setExtract({
         ...json.extract,
         mata_pelajaran: maklumat.nama,
         tingkatan: maklumat.tahap,
       });
       setRingkasan(json.ringkasan);
-      setJumlahMukaSurat(json.jumlahMukaSurat);
+      setJumlahMukaSurat(json.jumlahMukaSurat ?? null);
       toast.success("PDF DSKP berjaya dianalisis.");
       if (json.extract?.amaran) toast.warning(json.extract.amaran);
     } catch (error) {
@@ -100,7 +120,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
         })
       );
       const res = await fetch("/api/dskp/save", { method: "POST", body: form });
-      const json = await res.json();
+      const json = await bacaJson(res);
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan.");
       toast.success("DSKP disimpan ke Supabase.");
       router.push(`/dskp/${json.id}`);
