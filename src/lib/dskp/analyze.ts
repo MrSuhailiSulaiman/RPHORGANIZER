@@ -2,7 +2,7 @@ import { generateText, Output } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { geminiApiKey, runtimeEnv } from "@/lib/runtime-env";
-import { parseDskpText, teksKurikulumDskp } from "./parse";
+import { parseDskpText, teksKurikulumDskp, bersihkanExtractDskp } from "./parse";
 import { dskpAiSchema, type DskpAiSchema } from "./schema";
 import type { BidangPembelajaran, DskpExtract } from "./types";
 
@@ -27,7 +27,11 @@ Ambil HANYA:
 2. Standard Kandungan (kod seperti 1.1)
 3. Standard Pembelajaran (kod seperti 1.1.1)
 
-JANGAN masukkan Standard Prestasi, Tahap Penguasaan, rubrik, atau tafsiran 1-6.
+JANGAN masukkan Standard Prestasi, Tahap Penguasaan 1-6, rubrik, atau Tafsiran.
+Lajur kanan DSKP (Tahap Penguasaan / Tafsiran) BUKAN standard pembelajaran.
+Jika ayat SP bersambung dengan "1 Menyatakan... 2 Menerangkan... 3 Mengaplikasi..." potong SEBELUM nombor 1 itu.
+pernyataan SP hanya ayat kurikulum, contoh: "Menerangkan keperluan penyelesaian masalah berstrategi"
+Jangan salin descriptor TP seperti "Menyatakan", "Menerangkan", "Mengaplikasi", "Menganalisis", "Menilai", "Mencipta" yang bernombor 1-6.
 Jika ada sub-item (i) (ii) (iii), letakkan dalam butiran. Jika tiada, butiran = [].
 penerangan, tahun_terbitan, dan jam mesti string. Jika tiada, guna string kosong.
 jam contoh "20" atau "".
@@ -72,13 +76,13 @@ function dariAi(object: DskpAiSchema): DskpExtract {
     })),
   }));
 
-  return {
+  return bersihkanExtractDskp({
     mata_pelajaran: object.mata_pelajaran.trim(),
     tingkatan: object.tingkatan.trim(),
     tahun_terbitan: teksAtauNull(object.tahun_terbitan),
     bidang,
     kaedah_analisis: "ai",
-  };
+  });
 }
 
 async function janaDskpAi(prompt: string): Promise<DskpAiSchema> {

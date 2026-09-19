@@ -13,8 +13,72 @@ const HEADER_PATTERNS = [
 
 const CODE_RE = /(\d+\.\d+\.\d+|\d+\.0|\d+\.\d+)/g;
 
-const TP_CUT =
-  /\s1\s+(?:Menyatakan|Menerangkan|Menggunakan|Membuat|Memberi|Mencadangkan|Menulis|Melukis|Melaksanakan|Mencari|Menilai|Menghasilkan|Mengenalpasti|Membangunkan|Mengemas|Mengesan|Menentukan|Memilih|Membina|Membanding|Mengkategorikan|Menghuraikan|Menunjukkan|Menjelaskan|Mereka|Mencipta|Menyenaraikan|Mengkaji|Membanding beza)/;
+const PENANDA_TP =
+  /\b(?:TAHAP\s*PENGUASAAN|STANDARD\s+PRESTASI|TAFSIRAN|RUBRIK(?:\s+PRESTASI)?|TP\s*[1-6])\b/i;
+
+const KATA_KERJA_TP =
+  "(?:Murid\\s+)?(?:dapat\\s+|boleh\\s+)?(?:Men|Mem|Meng|Mel|Mer|Menc)[A-Za-z]{3,}";
+
+const TP_BERTURUT =
+  new RegExp(`\\s1[\\.\\)\\:]?\\s+${KATA_KERJA_TP}[\\s\\S]{0,280}?\\s2[\\.\\)\\:]?\\s+${KATA_KERJA_TP}`, "i");
+
+const TP_TAHAP_SATU =
+  /\s1[\.\)\:]?\s+(?:Murid\s+)?(?:dapat\s+|boleh\s+)?Menyatakan\b/i;
+
+export function indeksTahapPenguasaan(text: string) {
+  const calon: number[] = [];
+  const penanda = text.search(PENANDA_TP);
+  if (penanda >= 0) calon.push(penanda);
+  const berturut = text.search(TP_BERTURUT);
+  if (berturut >= 0) calon.push(berturut);
+  const tahapSatu = text.search(TP_TAHAP_SATU);
+  if (tahapSatu >= 0) calon.push(tahapSatu);
+  return calon.length ? Math.min(...calon) : -1;
+}
+
+export function buangTahapPenguasaan(text: string) {
+  const idx = indeksTahapPenguasaan(text);
+  const terpotong = idx >= 0 ? text.slice(0, idx) : text;
+  return compact(
+    terpotong
+      .replace(/\b(?:STANDARD\s+PRESTASI|TAHAP\s*PENGUASAAN|TAFSIRAN|RUBRIK)\b/gi, " ")
+      .replace(/\s+/g, " ")
+  );
+}
+
+function butiranTanpaTp(butiran: string[]) {
+  return butiran
+    .map((item) => buangTahapPenguasaan(item))
+    .map((item) => compact(item.replace(/^\([ivx]+\)\s*/i, "")))
+    .filter((item) => {
+      if (!item) return false;
+      if (/^(?:[1-6][\.\)\:]?|TP\s*[1-6])\b/i.test(item)) return false;
+      if (/^(?:Tahap\s*Penguasaan|Tafsiran|Standard\s+Prestasi)\b/i.test(item)) return false;
+      return item.length > 2;
+    });
+}
+
+export function bersihkanExtractDskp<T extends { bidang: BidangPembelajaran[] }>(extract: T): T {
+  return {
+    ...extract,
+    bidang: extract.bidang.map((bidang) => ({
+      ...bidang,
+      nama: buangTahapPenguasaan(bidang.nama) || bidang.nama,
+      standard_kandungan: bidang.standard_kandungan.map((sk) => ({
+        ...sk,
+        tajuk: buangTahapPenguasaan(sk.tajuk) || sk.kod,
+        standard_pembelajaran: sk.standard_pembelajaran.map((sp) => {
+          const { pernyataan, butiran } = splitButiran(buangTahapPenguasaan(sp.pernyataan));
+          return {
+            ...sp,
+            pernyataan: pernyataan || compact(sp.pernyataan),
+            butiran: [...new Set(butiranTanpaTp([...butiran, ...sp.butiran]))],
+          };
+        }),
+      })),
+    })),
+  };
+}
 
 function normalise(text: string) {
   return text
@@ -59,8 +123,7 @@ function splitButiran(text: string): { pernyataan: string; butiran: string[] } {
 }
 
 function cutPrestasi(body: string) {
-  const idx = body.search(TP_CUT);
-  return idx >= 0 ? body.slice(0, idx) : body;
+  return buangTahapPenguasaan(body);
 }
 
 function extractMetadata(text: string) {
@@ -218,11 +281,11 @@ export function parseDskpText(rawText: string): DskpExtract {
     }
   }
 
-  return {
+  return bersihkanExtractDskp({
     ...metadata,
     bidang,
     kaedah_analisis: "parser",
-  };
+  });
 }
 
 export function ringkasanExtract(extract: DskpExtract) {
