@@ -26,6 +26,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
   const [jumlahMukaSurat, setJumlahMukaSurat] = useState<number | null>(null);
   const [sedangAnalisis, setSedangAnalisis] = useState(false);
   const [sedangSimpan, setSedangSimpan] = useState(false);
+  const [storagePath, setStoragePath] = useState("");
   const [seret, setSeret] = useState(false);
 
   const maklumat = sahkanMaklumatDskp(mataPelajaran, tingkatan);
@@ -58,14 +59,43 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
         ringkasan?: Ringkasan;
         jumlahMukaSurat?: number;
         id?: string;
+        path?: string;
+        signedUrl?: string;
       };
     } catch {
       throw new Error(
-        res.status === 504 || res.status === 408
-          ? "Permintaan tamat masa. Sila cuba semula."
+        res.status === 413 || res.status === 504 || res.status === 408 || res.status >= 500
+          ? "Analisis tamat masa atau fail terlalu besar. Sila cuba semula."
           : "Permintaan gagal. Sila cuba semula."
       );
     }
+  }
+
+  async function muatNaikKeStoran(file: File) {
+    const res = await fetch("/api/dskp/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nama_fail: file.name, saiz: file.size }),
+    });
+    const json = await bacaJson(res);
+    if (!res.ok || !json.signedUrl || !json.path) {
+      throw new Error(json.ralat ?? "Gagal sediakan muat naik PDF.");
+    }
+    const form = new FormData();
+    form.append("cacheControl", "3600");
+    form.append("", file);
+    let put = await fetch(json.signedUrl, { method: "PUT", body: form });
+    if (!put.ok) {
+      put = await fetch(json.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: file,
+      });
+    }
+    if (!put.ok) {
+      throw new Error("Gagal muat naik PDF ke storan.");
+    }
+    return json.path;
   }
 
   async function analisis() {
@@ -76,13 +106,28 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
     }
     setSedangAnalisis(true);
     setExtract(null);
+    setStoragePath("");
     try {
-      const form = new FormData();
-      form.append("file", fail);
-      const res = await fetch("/api/dskp/analyze", { method: "POST", body: form });
+      let res: Response;
+      let path = storagePath;
+      try {
+        path = await muatNaikKeStoran(fail);
+        setStoragePath(path);
+        res = await fetch("/api/dskp/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }),
+        });
+      } catch (error) {
+        if (fail.size > 4 * 1024 * 1024) throw error;
+        const form = new FormData();
+        form.append("file", fail);
+        res = await fetch("/api/dskp/analyze", { method: "POST", body: form });
+      }
       const json = await bacaJson(res);
       if (!res.ok) throw new Error(json.ralat ?? "Analisis gagal.");
       if (!json.extract || !json.ringkasan) throw new Error("Hasil analisis tidak lengkap.");
+      if (json.path) setStoragePath(json.path);
       setExtract({
         ...json.extract,
         mata_pelajaran: maklumat.nama,
@@ -107,19 +152,32 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
     }
     setSedangSimpan(true);
     try {
-      const form = new FormData();
-      form.append("file", fail);
-      form.append("mata_pelajaran", maklumat.nama);
-      form.append("tingkatan", maklumat.tahap);
-      form.append(
-        "payload",
-        JSON.stringify({
-          ...extract,
-          mata_pelajaran: maklumat.nama,
-          tingkatan: maklumat.tahap,
-        })
-      );
-      const res = await fetch("/api/dskp/save", { method: "POST", body: form });
+      let res: Response;
+      const payload = {
+        ...extract,
+        mata_pelajaran: maklumat.nama,
+        tingkatan: maklumat.tahap,
+      };
+      if (storagePath) {
+        res = await fetch("/api/dskp/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: storagePath,
+            payload,
+            mata_pelajaran: maklumat.nama,
+            tingkatan: maklumat.tahap,
+            nama_fail: fail.name,
+          }),
+        });
+      } else {
+        const form = new FormData();
+        form.append("file", fail);
+        form.append("mata_pelajaran", maklumat.nama);
+        form.append("tingkatan", maklumat.tahap);
+        form.append("payload", JSON.stringify(payload));
+        res = await fetch("/api/dskp/save", { method: "POST", body: form });
+      }
       const json = await bacaJson(res);
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan.");
       toast.success("DSKP disimpan ke Supabase.");
@@ -204,6 +262,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
               if (dropped) {
                 setFail(dropped);
                 setExtract(null);
+                setStoragePath("");
               }
             }}
             className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center transition-colors ${
@@ -221,6 +280,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
                 const next = event.target.files?.[0] ?? null;
                 setFail(next);
                 setExtract(null);
+                setStoragePath("");
               }}
             />
           </label>

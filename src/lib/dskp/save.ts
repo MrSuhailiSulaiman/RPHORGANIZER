@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DSKP_BUCKET, muatTurunDskp } from "./storage";
 import type { DskpExtract } from "./types";
-
-const BUCKET = "dskp-pdf";
 
 export function hashFail(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -11,23 +10,34 @@ export function hashFail(bytes: Uint8Array) {
 export async function simpanDskp(params: {
   extract: DskpExtract;
   namaFail: string;
-  pdfBytes: Uint8Array;
   mataPelajaran: string;
   tingkatan: string;
+  pdfBytes?: Uint8Array;
+  storagePath?: string;
 }) {
   const supabase = createAdminClient();
-  const failHash = hashFail(params.pdfBytes);
-  const storagePath = `${crypto.randomUUID()}/${params.namaFail.replace(/[^\w.\- ()]/g, "_")}`;
+  let storagePath = params.storagePath?.trim() || "";
+  let bytes = params.pdfBytes;
+  const baruMuat = !storagePath;
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(storagePath, params.pdfBytes, {
+  if (storagePath && !bytes) {
+    bytes = await muatTurunDskp(storagePath);
+  }
+  if (!bytes) {
+    throw new Error("Fail PDF diperlukan.");
+  }
+
+  const failHash = hashFail(bytes);
+
+  if (!storagePath) {
+    storagePath = `${crypto.randomUUID()}/${params.namaFail.replace(/[^\w.\- ()]/g, "_")}`;
+    const { error: uploadError } = await supabase.storage.from(DSKP_BUCKET).upload(storagePath, bytes, {
       contentType: "application/pdf",
       upsert: false,
     });
-
-  if (uploadError) {
-    throw new Error(`Gagal muat naik PDF: ${uploadError.message}`);
+    if (uploadError) {
+      throw new Error(`Gagal muat naik PDF: ${uploadError.message}`);
+    }
   }
 
   const payload = {
@@ -44,7 +54,9 @@ export async function simpanDskp(params: {
   const { data, error } = await supabase.rpc("simpan_dskp", { payload });
 
   if (error) {
-    await supabase.storage.from(BUCKET).remove([storagePath]);
+    if (baruMuat) {
+      await supabase.storage.from(DSKP_BUCKET).remove([storagePath]);
+    }
     throw new Error(`Gagal simpan ke pangkalan data: ${error.message}`);
   }
 

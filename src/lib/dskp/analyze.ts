@@ -18,12 +18,8 @@ export function hasAiProvider() {
   return hasGoogleKey() || hasOpenAiKey();
 }
 
-const GEMINI_MODELS = [
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-  "gemini-3.5-flash",
-  "gemini-3.6-flash",
-] as const;
+const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] as const;
+const MASA_AI_MS = 18_000;
 
 const INSTRUCTIONS = `Anda mengekstrak DSKP KSSM Malaysia.
 Ambil HANYA:
@@ -44,7 +40,7 @@ function googleModel(nama: string) {
 
 function bolehCubaModelLain(error: unknown) {
   const mesej = error instanceof Error ? error.message : String(error);
-  return /high demand|no longer available|not found|not supported|404|unavailable|quota|rate[- ]limit|429|resource exhausted|overloaded|pattern|schema|invalid.?argument|timeout/i.test(
+  return /high demand|no longer available|not found|not supported|404|unavailable|quota|rate[- ]limit|429|resource exhausted|overloaded|pattern|schema|invalid.?argument|timeout|abort/i.test(
     mesej
   );
 }
@@ -85,27 +81,7 @@ function dariAi(object: DskpAiSchema): DskpExtract {
   };
 }
 
-async function janaDskpAi(params: {
-  prompt: string;
-  pdfBytes?: Uint8Array;
-}): Promise<DskpAiSchema> {
-  const content =
-    hasGoogleKey() && params.pdfBytes
-      ? [
-          { type: "text" as const, text: params.prompt },
-          {
-            type: "file" as const,
-            data: params.pdfBytes,
-            mediaType: "application/pdf",
-          },
-        ]
-      : params.prompt;
-
-  const outputOptions =
-    typeof content === "string"
-      ? { prompt: content }
-      : { messages: [{ role: "user" as const, content }] };
-
+async function janaDskpAi(prompt: string): Promise<DskpAiSchema> {
   if (hasGoogleKey()) {
     let last: unknown;
     for (const nama of GEMINI_MODELS) {
@@ -113,8 +89,9 @@ async function janaDskpAi(params: {
         const { output } = await generateText({
           model: googleModel(nama),
           output: Output.object({ schema: dskpAiSchema }),
-          maxRetries: 1,
-          ...outputOptions,
+          maxRetries: 0,
+          abortSignal: AbortSignal.timeout(12_000),
+          prompt,
         });
         if (output?.bidang?.length) return output;
         last = new Error("Gemini pulangkan struktur DSKP kosong.");
@@ -130,8 +107,9 @@ async function janaDskpAi(params: {
   const { output } = await generateText({
     model: openai("gpt-4o"),
     output: Output.object({ schema: dskpAiSchema }),
-    maxRetries: 1,
-    ...outputOptions,
+    maxRetries: 0,
+    abortSignal: AbortSignal.timeout(12_000),
+    prompt,
   });
   if (!output?.bidang?.length) {
     throw new Error("Model AI pulangkan struktur DSKP kosong.");
@@ -139,11 +117,7 @@ async function janaDskpAi(params: {
   return output;
 }
 
-async function analyzeWithAi(params: {
-  text: string;
-  parsed: DskpExtract;
-  pdfBytes?: Uint8Array;
-}): Promise<DskpExtract> {
+async function analyzeWithAi(params: { text: string; parsed: DskpExtract }): Promise<DskpExtract> {
   const hint = JSON.stringify(
     {
       mata_pelajaran: params.parsed.mata_pelajaran,
@@ -173,16 +147,12 @@ async function analyzeWithAi(params: {
   const prompt = `${INSTRUCTIONS}
 
 Hasil parser awal (betulkan jika salah atau tidak lengkap):
-${hint}
+${hint.slice(0, 20000)}
 
 Teks DSKP (bahagian relevan):
-${kurikulum.slice(0, 60000)}`;
+${kurikulum.slice(0, 25000)}`;
 
-  const teksCukup = kurikulum.replace(/\s+/g, " ").trim().length >= 800;
-  const pdfKecil = (params.pdfBytes?.byteLength ?? 0) > 0 && (params.pdfBytes?.byteLength ?? 0) <= 4 * 1024 * 1024;
-  const pdfBytes = !teksCukup && pdfKecil ? params.pdfBytes : undefined;
-
-  const object = await janaDskpAi({ prompt, pdfBytes });
+  const object = await janaDskpAi(prompt);
   const extract = dariAi(object);
   if (!extract.bidang.length) {
     throw new Error("Struktur DSKP AI kosong.");
@@ -190,21 +160,19 @@ ${kurikulum.slice(0, 60000)}`;
   return extract;
 }
 
-export async function analyzeDskp(params: {
-  text: string;
-  pdfBytes?: Uint8Array;
-}): Promise<DskpExtract> {
+export async function analyzeDskp(params: { text: string }): Promise<DskpExtract> {
   const parsed = parseDskpText(params.text);
   if (!hasAiProvider()) {
     return parsed;
   }
 
   try {
-    return await analyzeWithAi({
-      text: params.text,
-      parsed,
-      pdfBytes: params.pdfBytes,
-    });
+    return await Promise.race([
+      analyzeWithAi({ text: params.text, parsed }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timeout")), MASA_AI_MS);
+      }),
+    ]);
   } catch (error) {
     console.error("analyzeDskp", error instanceof Error ? error.message : error);
     return {
