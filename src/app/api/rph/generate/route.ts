@@ -12,6 +12,7 @@ import {
   susunSlotTahun,
   tarikhMulaTahunAsal,
   tarikhSlot,
+  unitUntukSlot,
 } from "@/lib/rph/tahun";
 
 export const runtime = "nodejs";
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     const rekod = slots.map((slot) => {
-      const unit = slot.unit;
+      const unit = unitUntukSlot(slot, kurikulum);
       const bahan =
         (unit && slot.dokumen_id
           ? bahanMengikutDokumen.get(slot.dokumen_id)?.get(unit.sk_kod)

@@ -381,9 +381,11 @@ export function SenaraiRph() {
                       </Link>
                     </div>
                     <div className="flex items-center gap-2">
-                      {item.sk_kod ? (
+                      {(item.sk_kod || item.sk_tajuk) ? (
                         <Badge variant="secondary">
-                          {item.sk_kod} {item.sk_tajuk}
+                          {item.sk_tajuk?.startsWith(item.sk_kod ?? "")
+                            ? item.sk_tajuk
+                            : [item.sk_kod, item.sk_tajuk].filter(Boolean).join(" ")}
                         </Badge>
                       ) : null}
                       <Button

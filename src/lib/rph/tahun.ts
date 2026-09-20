@@ -69,31 +69,89 @@ function nomborTingkatan(value: string) {
   return match ? match[0] : "";
 }
 
+function bersihkan(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+export function gabungKodTajuk(kod: string | null | undefined, tajuk: string | null | undefined) {
+  const k = bersihkan(kod);
+  const n = bersihkan(tajuk);
+  if (!k) return n;
+  if (!n || n === k || n.startsWith(`${k} `)) return n || k;
+  return `${k} ${n}`;
+}
+
+function kodDariTajuk(tajuk: string) {
+  const match = tajuk.match(/^(\d+(?:\.\d+)*)/);
+  return match?.[1] ?? "";
+}
+
+function unitDariSk(
+  kurikulum: KurikulumPilihan,
+  bidang: KurikulumPilihan["bidang"][number],
+  sk: KurikulumPilihan["bidang"][number]["standard_kandungan"][number]
+): UnitKurikulum | null {
+  const sk_kod = bersihkan(sk.kod) || kodDariTajuk(sk.tajuk);
+  const sk_tajuk = gabungKodTajuk(sk_kod, sk.tajuk) || sk_kod;
+  if (!sk_kod && !sk_tajuk) return null;
+  return {
+    kunci: `${kurikulum.mata_pelajaran}|${kurikulum.tingkatan ?? ""}|${sk_kod || sk_tajuk}`,
+    bidang_kod: bersihkan(bidang.kod),
+    bidang_nama: gabungKodTajuk(bidang.kod, bidang.nama),
+    sk_kod: sk_kod || sk_tajuk,
+    sk_tajuk: sk_tajuk || sk_kod,
+    standard_pembelajaran: sk.standard_pembelajaran ?? [],
+  };
+}
+
+export function lengkapkanUnit(unit: UnitKurikulum | null | undefined): UnitKurikulum | null {
+  if (!unit) return null;
+  const sk_kod = bersihkan(unit.sk_kod) || kodDariTajuk(unit.sk_tajuk);
+  const sk_tajuk = gabungKodTajuk(sk_kod, unit.sk_tajuk) || sk_kod;
+  if (!sk_kod && !sk_tajuk) return null;
+  return {
+    ...unit,
+    bidang_kod: bersihkan(unit.bidang_kod),
+    bidang_nama: gabungKodTajuk(unit.bidang_kod, unit.bidang_nama),
+    sk_kod: sk_kod || sk_tajuk,
+    sk_tajuk: sk_tajuk || sk_kod,
+  };
+}
+
 export function ratakanKurikulum(kurikulum: KurikulumPilihan): UnitKurikulum[] {
   const unit: UnitKurikulum[] = [];
   for (const bidang of kurikulum.bidang) {
     for (const sk of bidang.standard_kandungan) {
-      if (!sk.standard_pembelajaran.length) continue;
-      unit.push({
-        kunci: `${kurikulum.mata_pelajaran}|${kurikulum.tingkatan ?? ""}|${sk.kod}`,
-        bidang_kod: bidang.kod,
-        bidang_nama: `${bidang.kod} ${bidang.nama}`.trim(),
-        sk_kod: sk.kod,
-        sk_tajuk: sk.tajuk,
-        standard_pembelajaran: sk.standard_pembelajaran,
-      });
+      const item = unitDariSk(kurikulum, bidang, sk);
+      if (item) unit.push(item);
     }
   }
   return unit;
 }
 
-export function padankanKurikulum(sesi: SesiPdp, senarai: KurikulumPilihan[]) {
-  const tahap = nomborTingkatan(sesi.tingkatan) || nomborTingkatan(sesi.kelas);
-  const mp = sesi.mata_pelajaran.toLowerCase();
-  const calon = senarai.filter((item) => {
-    const nama = (item.mata_pelajaran ?? "").toLowerCase();
-    return nama.includes(mp) || mp.includes(nama);
-  });
+function normalNama(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/tingkatan\s*\d+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function skorMataPelajaran(sesiNama: string, dskpNama: string) {
+  const a = normalNama(sesiNama);
+  const b = normalNama(dskpNama);
+  if (!a || !b) return 0;
+  if (a === b) return 100;
+  if (a.includes(b) || b.includes(a)) return 80;
+  const perkataanA = a.split(" ").filter((w) => w.length > 2);
+  const perkataanB = new Set(b.split(" ").filter((w) => w.length > 2));
+  if (!perkataanA.length || !perkataanB.size) return 0;
+  const sama = perkataanA.filter((w) => perkataanB.has(w)).length;
+  if (!sama) return 0;
+  return Math.min(70, 20 + sama * 15);
+}
+
+function pilihMengikutTahap(calon: KurikulumPilihan[], tahap: string) {
   return (
     calon.find((item) => {
       const nilai = nomborTingkatan(item.tingkatan ?? "");
@@ -101,6 +159,32 @@ export function padankanKurikulum(sesi: SesiPdp, senarai: KurikulumPilihan[]) {
     }) ??
     calon[0] ??
     null
+  );
+}
+
+export function padankanKurikulum(sesi: SesiPdp, senarai: KurikulumPilihan[]) {
+  const tahap = nomborTingkatan(sesi.tingkatan) || nomborTingkatan(sesi.kelas);
+  const mp = sesi.mata_pelajaran.toLowerCase();
+  const tepat = senarai.filter((item) => {
+    const nama = (item.mata_pelajaran ?? "").toLowerCase();
+    return Boolean(nama) && (nama.includes(mp) || mp.includes(nama));
+  });
+  if (tepat.length) return pilihMengikutTahap(tepat, tahap);
+
+  const longgar = senarai
+    .map((item) => ({ item, skor: skorMataPelajaran(sesi.mata_pelajaran, item.mata_pelajaran ?? "") }))
+    .filter((row) => row.skor >= 40)
+    .sort((a, b) => b.skor - a.skor)
+    .map((row) => row.item);
+  return pilihMengikutTahap(longgar, tahap);
+}
+
+export function unitUntukSlot(slot: SlotTahun, senarai: KurikulumPilihan[]) {
+  const dokumen =
+    (slot.dokumen_id ? senarai.find((item) => item.dokumen_id === slot.dokumen_id) : null) ??
+    padankanKurikulum(slot.sesi, senarai);
+  return (
+    lengkapkanUnit(slot.unit) ?? lengkapkanUnit(dokumen ? ratakanKurikulum(dokumen)[0] : undefined)
   );
 }
 
@@ -160,7 +244,9 @@ export function susunSlotTahun(params: {
         minggu,
         tarikh: tarikhSlot(mula, minggu, sesi.hari),
         sesi,
-        unit: unitSeterusnya(kunciSesi(sesi)),
+        unit:
+          lengkapkanUnit(unitSeterusnya(kunciSesi(sesi))) ??
+          lengkapkanUnit((unitMengikutKunci.get(kunciSesi(sesi)) ?? [])[0]),
         dokumen_id: dokumenMengikutKunci.get(kunciSesi(sesi)) ?? null,
       });
     }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HARI_LIST, tarikhUntukHari } from "@/lib/jadual/parse";
 import type { BorangRphNilai } from "@/lib/rph/borang";
+import { gabungKodTajuk } from "@/lib/rph/tahun";
 import type { KurikulumPilihan, RphStandard } from "@/lib/rph/types";
 
 const cell = "border border-slate-400 px-2 py-2 align-top";
@@ -19,6 +20,29 @@ const field =
 
 const cacheKurikulum = new Map<string, KurikulumPilihan | null>();
 const inflightKurikulum = new Map<string, Promise<KurikulumPilihan | null>>();
+
+function samaKod(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function cariSk(
+  bidang: KurikulumPilihan["bidang"],
+  kod: string,
+  tajuk: string
+) {
+  const semua = bidang.flatMap((item) => item.standard_kandungan.map((sk) => ({ bidang: item, sk })));
+  const kodBersih = kod.trim();
+  const tajukBersih = tajuk.trim();
+  return (
+    semua.find((row) => kodBersih && samaKod(row.sk.kod, kodBersih)) ??
+    semua.find(
+      (row) =>
+        tajukBersih &&
+        (samaKod(row.sk.tajuk, tajukBersih) || samaKod(gabungKodTajuk(row.sk.kod, row.sk.tajuk), tajukBersih))
+    ) ??
+    null
+  );
+}
 
 function muatKurikulum(mata: string, tingkatan: string) {
   const kunci = `${mata}|${tingkatan}`;
@@ -59,6 +83,10 @@ export function JadualRph({
 }) {
   const [kurikulum, setKurikulum] = useState<KurikulumPilihan | null>(null);
   const namaRefleksi = `refleksi-${borang.id ?? "baru"}`;
+  const borangRujukan = useRef(borang);
+  const onChangeRujukan = useRef(onChange);
+  borangRujukan.current = borang;
+  onChangeRujukan.current = onChange;
 
   useEffect(() => {
     if (!borang.mata_pelajaran) {
@@ -75,24 +103,68 @@ export function JadualRph({
   }, [borang.mata_pelajaran, borang.tingkatan]);
 
   const bidang = kurikulum?.bidang ?? [];
+
+  useEffect(() => {
+    const senarai = kurikulum?.bidang ?? [];
+    if (!senarai.length) return;
+    const current = borangRujukan.current;
+    const jumpa = cariSk(senarai, current.sk_kod, current.sk_tajuk);
+    if (jumpa) {
+      const skTajuk = gabungKodTajuk(jumpa.sk.kod, jumpa.sk.tajuk);
+      const bidangNama = gabungKodTajuk(jumpa.bidang.kod, jumpa.bidang.nama);
+      if (
+        current.sk_kod === jumpa.sk.kod &&
+        current.sk_tajuk === skTajuk &&
+        current.bidang_kod === jumpa.bidang.kod &&
+        current.bidang_nama === bidangNama
+      ) {
+        return;
+      }
+      onChangeRujukan.current({
+        ...current,
+        bidang_kod: jumpa.bidang.kod,
+        bidang_nama: bidangNama,
+        sk_kod: jumpa.sk.kod,
+        sk_tajuk: skTajuk,
+      });
+      return;
+    }
+    if (current.sk_kod.trim() || current.sk_tajuk.trim()) return;
+    const bidangPilih = senarai.find((item) => samaKod(item.kod, current.bidang_kod)) ?? senarai[0];
+    const sk = bidangPilih?.standard_kandungan.find((item) => item.kod || item.tajuk);
+    if (!sk || !bidangPilih) return;
+    onChangeRujukan.current({
+      ...current,
+      bidang_kod: current.bidang_kod || bidangPilih.kod,
+      bidang_nama: current.bidang_nama || gabungKodTajuk(bidangPilih.kod, bidangPilih.nama),
+      sk_kod: sk.kod,
+      sk_tajuk: gabungKodTajuk(sk.kod, sk.tajuk),
+    });
+  }, [kurikulum, borang.id, borang.sk_kod, borang.sk_tajuk, borang.bidang_kod]);
+
   const skList = useMemo(() => {
-    const pilih = bidang.find((item) => item.kod === borang.bidang_kod) ?? bidang[0];
+    const pilih =
+      bidang.find((item) => samaKod(item.kod, borang.bidang_kod)) ??
+      cariSk(bidang, borang.sk_kod, borang.sk_tajuk)?.bidang ??
+      bidang[0];
     return pilih?.standard_kandungan ?? [];
-  }, [bidang, borang.bidang_kod]);
+  }, [bidang, borang.bidang_kod, borang.sk_kod, borang.sk_tajuk]);
   const spList = useMemo(() => {
-    const pilih = skList.find((item) => item.kod === borang.sk_kod) ?? skList[0];
+    const pilih = skList.find((item) => samaKod(item.kod, borang.sk_kod)) ?? skList[0];
     return pilih?.standard_pembelajaran ?? [];
   }, [skList, borang.sk_kod]);
+  const skDalamSenarai = skList.some((item) => samaKod(item.kod, borang.sk_kod));
+  const bidangDalamSenarai = bidang.some((item) => samaKod(item.kod, borang.bidang_kod));
 
   function kemaskini(patch: Partial<BorangRphNilai>) {
     onChange({ ...borang, ...patch });
   }
 
   function pilihBidang(kod: string) {
-    const item = bidang.find((row) => row.kod === kod);
+    const item = bidang.find((row) => samaKod(row.kod, kod));
     kemaskini({
       bidang_kod: kod,
-      bidang_nama: item ? `${item.kod} ${item.nama}`.trim() : borang.bidang_nama,
+      bidang_nama: item ? gabungKodTajuk(item.kod, item.nama) : borang.bidang_nama,
       sk_kod: "",
       sk_tajuk: "",
       standard_pembelajaran: [],
@@ -100,10 +172,10 @@ export function JadualRph({
   }
 
   function pilihSk(kod: string) {
-    const item = skList.find((row) => row.kod === kod);
+    const item = skList.find((row) => samaKod(row.kod, kod));
     kemaskini({
-      sk_kod: kod,
-      sk_tajuk: item ? `${item.kod} ${item.tajuk}`.trim() : borang.sk_tajuk,
+      sk_kod: item?.kod || kod,
+      sk_tajuk: item ? gabungKodTajuk(item.kod, item.tajuk) : borang.sk_tajuk,
       standard_pembelajaran: [],
     });
   }
@@ -205,6 +277,11 @@ export function JadualRph({
                   onChange={(event) => pilihBidang(event.target.value)}
                 >
                   <option value="">Pilih bidang</option>
+                  {!bidangDalamSenarai && borang.bidang_kod ? (
+                    <option value={borang.bidang_kod}>
+                      {borang.bidang_nama || borang.bidang_kod}
+                    </option>
+                  ) : null}
                   {bidang.map((item) => (
                     <option key={item.kod} value={item.kod}>
                       {item.kod} {item.nama}
@@ -227,13 +304,18 @@ export function JadualRph({
               {skList.length ? (
                 <select
                   className={`${field} bg-white`}
-                  value={borang.sk_kod}
+                  value={skDalamSenarai ? borang.sk_kod : borang.sk_kod || borang.sk_tajuk}
                   onChange={(event) => pilihSk(event.target.value)}
                 >
                   <option value="">Pilih standard kandungan</option>
+                  {!skDalamSenarai && (borang.sk_kod || borang.sk_tajuk) ? (
+                    <option value={borang.sk_kod || borang.sk_tajuk}>
+                      {borang.sk_tajuk || borang.sk_kod}
+                    </option>
+                  ) : null}
                   {skList.map((item) => (
-                    <option key={item.kod} value={item.kod}>
-                      {item.kod} {item.tajuk}
+                    <option key={item.kod || item.tajuk} value={item.kod}>
+                      {gabungKodTajuk(item.kod, item.tajuk)}
                     </option>
                   ))}
                 </select>
