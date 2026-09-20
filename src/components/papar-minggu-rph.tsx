@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import { dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
+import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 import { bandingSesiRph, kumpulanMingguRph, type KumpulanMingguRph } from "@/lib/rph/tahun";
 import type { RphRekod } from "@/lib/rph/types";
 
@@ -25,6 +26,7 @@ export function PaparMingguRph() {
   const [kumpulanMinggu, setKumpulanMinggu] = useState<KumpulanMingguRph<RphRekod>[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangSimpan, setSedangSimpan] = useState(false);
+  const [sedangPdf, setSedangPdf] = useState(false);
 
   useEffect(() => {
     let hidup = true;
@@ -92,6 +94,31 @@ export function PaparMingguRph() {
     }
   }
 
+  async function muatPdfMinggu() {
+    if (sedangPdf) return;
+    const nomborMinggu = minggu || kumpulanMinggu[0]?.minggu || 1;
+    const kumpul = kumpulanMinggu.find((item) => item.minggu === nomborMinggu);
+    const ids = (kumpul?.item.map((item) => item.id) ?? borang.map((item) => item.id ?? "")).filter(Boolean);
+    if (!ids.length) {
+      toast.error("Tiada sesi RPH pada minggu ini.");
+      return;
+    }
+    setSedangPdf(true);
+    try {
+      await muatTurunPdfMinggu({
+        ids,
+        minggu: nomborMinggu,
+        tarikh_mula: kumpul?.tarikh_mula,
+        tarikh_tamat: kumpul?.tarikh_tamat,
+      });
+      toast.success(`PDF RPH Minggu ${nomborMinggu} dimuat turun.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memuat turun PDF RPH.");
+    } finally {
+      setSedangPdf(false);
+    }
+  }
+
   if (sedangMuat) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -128,6 +155,15 @@ export function PaparMingguRph() {
               router.push(`/rph/minggu?minggu=${pilih}&ids=${kumpul.item.map((item) => item.id).join(",")}`);
             }}
           />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void muatPdfMinggu()}
+            disabled={sedangPdf || !borang.length}
+          >
+            {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
+            Download RPH
+          </Button>
           <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan || !borang.length}>
             {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
             Simpan
@@ -155,7 +191,16 @@ export function PaparMingguRph() {
           </Link>
         </p>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void muatPdfMinggu()}
+          disabled={sedangPdf || !borang.length}
+        >
+          {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
+          Download RPH
+        </Button>
         <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan}>
           {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
           Simpan

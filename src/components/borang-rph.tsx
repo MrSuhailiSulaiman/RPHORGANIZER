@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { tarikhUntukHari } from "@/lib/jadual/parse";
 import { borangKosong, dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
+import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 import { kumpulanMingguRph, rphMingguSemasa, type KumpulanMingguRph } from "@/lib/rph/tahun";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import type { RphRekod, RphStandard } from "@/lib/rph/types";
@@ -28,6 +29,7 @@ export function BorangRph({
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangPadam, setSedangPadam] = useState(false);
   const [sedangJana, setSedangJana] = useState(false);
+  const [sedangPdf, setSedangPdf] = useState(false);
   const [navMinggu, setNavMinggu] = useState<ReturnType<typeof rphMingguSemasa<RphRekod>>>(null);
   const [kumpulanMinggu, setKumpulanMinggu] = useState<KumpulanMingguRph<RphRekod>[]>([]);
   const janaMasa = useRef(0);
@@ -141,6 +143,33 @@ export function BorangRph({
     }
   }
 
+  async function muatPdfMinggu() {
+    if (sedangPdf) return;
+    const kumpul =
+      navMinggu ??
+      kumpulanMinggu.find((item) => item.item.some((row) => row.id === borang.id)) ??
+      kumpulanMinggu[0];
+    const ids = (kumpul?.item.map((item) => item.id) ?? []).filter(Boolean);
+    if (!kumpul || !ids.length) {
+      toast.error("Tiada sesi RPH pada minggu ini.");
+      return;
+    }
+    setSedangPdf(true);
+    try {
+      await muatTurunPdfMinggu({
+        ids,
+        minggu: kumpul.minggu,
+        tarikh_mula: kumpul.tarikh_mula,
+        tarikh_tamat: kumpul.tarikh_tamat,
+      });
+      toast.success(`PDF RPH Minggu ${kumpul.minggu} dimuat turun.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memuat turun PDF RPH.");
+    } finally {
+      setSedangPdf(false);
+    }
+  }
+
   async function janaSesi(pilihan?: { standard?: RphStandard[]; skop?: "objektif" | "penuh" }) {
     const standard = (pilihan?.standard ?? borang.standard_pembelajaran).filter((item) =>
       item.pernyataan.trim()
@@ -248,6 +277,15 @@ export function BorangRph({
         <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
           {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
           {sedangJana ? "Menjana RPH..." : "Generate RPH"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void muatPdfMinggu()}
+          disabled={sedangPdf || !(navMinggu?.item.length || kumpulanMinggu.length)}
+        >
+          {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
+          Download RPH
         </Button>
         <Button type="button" onClick={() => void simpan()} disabled={sedangSimpan}>
           {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
