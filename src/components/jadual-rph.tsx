@@ -192,6 +192,12 @@ export function JadualRph({
     });
   }
 
+  function pilihRefleksi(nilai: "ya" | "tidak") {
+    kemaskini({
+      refleksi_berjaya: borang.refleksi_berjaya === nilai ? "" : nilai,
+    });
+  }
+
   return (
     <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
       <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -466,7 +472,11 @@ export function JadualRph({
                   type="radio"
                   name={namaRefleksi}
                   checked={borang.refleksi_berjaya === "ya"}
-                  onChange={() => kemaskini({ refleksi_berjaya: "ya" })}
+                  onChange={() => undefined}
+                  onClick={(event) => {
+                    if (borang.refleksi_berjaya === "ya") event.preventDefault();
+                    pilihRefleksi("ya");
+                  }}
                 />
                 <span>
                   Murid <strong className="text-green-700">berjaya</strong> menguasai objektif pembelajaran
@@ -483,7 +493,11 @@ export function JadualRph({
                   type="radio"
                   name={namaRefleksi}
                   checked={borang.refleksi_berjaya === "tidak"}
-                  onChange={() => kemaskini({ refleksi_berjaya: "tidak" })}
+                  onChange={() => undefined}
+                  onClick={(event) => {
+                    if (borang.refleksi_berjaya === "tidak") event.preventDefault();
+                    pilihRefleksi("tidak");
+                  }}
                 />
                 <span>
                   Murid <strong className="text-red-700">tidak berjaya</strong> menguasai objektif

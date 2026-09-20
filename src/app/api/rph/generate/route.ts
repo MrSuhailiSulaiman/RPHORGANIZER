@@ -112,6 +112,7 @@ export async function POST(request: Request) {
         bbm: bahan.bbm,
         nilai: bahan.nilai,
         aktiviti: bahan.aktiviti,
+        refleksi_berjaya: true,
       };
     });
 

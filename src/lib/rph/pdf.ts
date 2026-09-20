@@ -265,11 +265,9 @@ function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: nu
 
   const refleksi = [
     rekod.refleksi_peratus != null ? `${rekod.refleksi_peratus}%` : "",
-    rekod.refleksi_berjaya == null
-      ? ""
-      : rekod.refleksi_berjaya
-        ? "Murid berjaya menguasai objektif pembelajaran dengan baik"
-        : "Murid tidak berjaya menguasai objektif pembelajaran dengan baik",
+    rekod.refleksi_berjaya === false
+      ? "Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
+      : "Murid berjaya menguasai objektif pembelajaran dengan baik",
     rekod.refleksi_catatan ?? "",
   ]
     .map((item) => teksPdf(item))
