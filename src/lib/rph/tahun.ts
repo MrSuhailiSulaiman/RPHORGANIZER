@@ -294,6 +294,40 @@ export function kumpulanMingguRph<T extends SlotMingguRph>(rekod: T[]) {
     }));
 }
 
+export type KumpulanMingguRph<T extends SlotMingguRph = SlotMingguRph> = {
+  minggu: number;
+  tarikh_mula?: string;
+  tarikh_tamat?: string;
+  item: T[];
+};
+
+export function labelMingguRph(kumpul: {
+  minggu: number;
+  tarikh_mula?: string | null;
+  tarikh_tamat?: string | null;
+}) {
+  const mula = kumpul.tarikh_mula ?? "";
+  const tamat = kumpul.tarikh_tamat ?? "";
+  const julat = mula && tamat && tamat !== mula ? `${mula} — ${tamat}` : mula;
+  return julat ? `Minggu ${kumpul.minggu} (${julat})` : `Minggu ${kumpul.minggu}`;
+}
+
+export function mingguSemasaDalam(
+  kumpulan: { minggu: number; tarikh_mula?: string | null; tarikh_tamat?: string | null }[],
+  rujukan = new Date()
+) {
+  if (!kumpulan.length) return null;
+  const hari = formatTarikh(rujukan);
+  const dalamJulat = kumpulan.find((kumpul) => {
+    const mula = kumpul.tarikh_mula ?? "";
+    const tamat = kumpul.tarikh_tamat ?? mula;
+    return Boolean(mula) && hari >= mula && hari <= tamat;
+  });
+  if (dalamJulat) return dalamJulat.minggu;
+  const lepas = [...kumpulan].reverse().find((kumpul) => (kumpul.tarikh_mula ?? "") <= hari);
+  return lepas?.minggu ?? kumpulan[0].minggu;
+}
+
 export function rphMingguSemasa<T extends SlotMingguRph>(rekod: T[], id: string) {
   const kumpulan = kumpulanMingguRph(rekod);
   const kumpul = kumpulan.find((item) => item.item.some((row) => row.id === id));

@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
+import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import { dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
-import { bandingSesiRph } from "@/lib/rph/tahun";
+import { bandingSesiRph, kumpulanMingguRph, type KumpulanMingguRph } from "@/lib/rph/tahun";
 import type { RphRekod } from "@/lib/rph/types";
 
 export function PaparMingguRph() {
+  const router = useRouter();
   const params = useSearchParams();
   const idsParam = params.get("ids") ?? "";
   const minggu = Number(params.get("minggu") ?? "0");
@@ -20,26 +22,28 @@ export function PaparMingguRph() {
     [idsParam]
   );
   const [borang, setBorang] = useState<BorangRphNilai[]>([]);
+  const [kumpulanMinggu, setKumpulanMinggu] = useState<KumpulanMingguRph<RphRekod>[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangSimpan, setSedangSimpan] = useState(false);
 
   useEffect(() => {
     let hidup = true;
     async function muat() {
-      if (!ids.length) {
-        setBorang([]);
-        setSedangMuat(false);
-        return;
-      }
       setSedangMuat(true);
       try {
-        const res = await fetch(`/api/rph?ids=${encodeURIComponent(ids.join(","))}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/api/rph?t=${Date.now()}`, { cache: "no-store" });
         const json = await res.json();
         if (!res.ok) throw new Error(json.ralat ?? "Gagal memuatkan RPH minggu ini.");
-        const rekod = ((json.rph ?? []) as RphRekod[]).sort(bandingSesiRph);
-        if (hidup) setBorang(rekod.map(dariRekod));
+        const senarai = ((json.rph ?? []) as RphRekod[]).sort(bandingSesiRph);
+        const kumpulan = kumpulanMingguRph(senarai);
+        const sasaran =
+          (minggu > 0 ? kumpulan.find((item) => item.minggu === minggu) : null) ??
+          kumpulan.find((item) => item.item.some((row) => ids.includes(row.id))) ??
+          kumpulan[0];
+        if (hidup) {
+          setKumpulanMinggu(kumpulan);
+          setBorang((sasaran?.item ?? []).map(dariRekod));
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Gagal memuatkan RPH minggu ini.");
       } finally {
@@ -50,7 +54,7 @@ export function PaparMingguRph() {
     return () => {
       hidup = false;
     };
-  }, [ids]);
+  }, [ids, minggu]);
 
   function kemaskini(indeks: number, nilai: BorangRphNilai) {
     setBorang((senarai) => senarai.map((item, i) => (i === indeks ? nilai : item)));
@@ -84,17 +88,6 @@ export function PaparMingguRph() {
     );
   }
 
-  if (!borang.length) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Tiada rekod RPH untuk minggu ini.{" "}
-        <Link href="/rph" className="underline">
-          Kembali ke senarai
-        </Link>
-      </p>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
@@ -107,28 +100,49 @@ export function PaparMingguRph() {
           </Button>
           <div>
             <h1 className="font-heading text-lg font-semibold tracking-tight">
-              Minggu {minggu || "?"}
+              Minggu {minggu || kumpulanMinggu[0]?.minggu || "?"}
             </h1>
             <p className="text-sm text-muted-foreground">{borang.length} sesi · kemaskini semua sekali gus</p>
           </div>
         </div>
-        <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan}>
-          {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
-          Simpan
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <TapisMingguRph
+            kumpulan={kumpulanMinggu}
+            nilai={minggu || kumpulanMinggu[0]?.minggu || "semua"}
+            onChange={(pilih) => {
+              if (pilih === "semua") return;
+              const kumpul = kumpulanMinggu.find((item) => item.minggu === pilih);
+              if (!kumpul) return;
+              router.push(`/rph/minggu?minggu=${pilih}&ids=${kumpul.item.map((item) => item.id).join(",")}`);
+            }}
+          />
+          <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan || !borang.length}>
+            {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
+            Simpan
+          </Button>
+        </div>
       </div>
-      {borang.map((item, indeks) => (
-        <section key={item.id ?? `sesi-${indeks}`} className="space-y-2" id={`sesi-${indeks + 1}`}>
-          <h2 className="font-heading text-sm font-medium">
-            Sesi {indeks + 1} / {borang.length}
-            {item.hari ? ` · ${item.hari}` : ""}
-            {item.masa ? ` · ${item.masa}` : ""}
-            {item.mata_pelajaran ? ` · ${item.mata_pelajaran}` : ""}
-            {item.kelas ? ` · ${item.kelas}` : ""}
-          </h2>
-          <JadualRph borang={item} onChange={(nilai) => kemaskini(indeks, nilai)} />
-        </section>
-      ))}
+      {borang.length ? (
+        borang.map((item, indeks) => (
+          <section key={item.id ?? `sesi-${indeks}`} className="space-y-2" id={`sesi-${indeks + 1}`}>
+            <h2 className="font-heading text-sm font-medium">
+              Sesi {indeks + 1} / {borang.length}
+              {item.hari ? ` · ${item.hari}` : ""}
+              {item.masa ? ` · ${item.masa}` : ""}
+              {item.mata_pelajaran ? ` · ${item.mata_pelajaran}` : ""}
+              {item.kelas ? ` · ${item.kelas}` : ""}
+            </h2>
+            <JadualRph borang={item} onChange={(nilai) => kemaskini(indeks, nilai)} />
+          </section>
+        ))
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Tiada rekod RPH untuk minggu ini.{" "}
+          <Link href="/rph" className="underline">
+            Kembali ke senarai
+          </Link>
+        </p>
+      )}
       <div className="flex justify-end">
         <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan}>
           {sedangSimpan ? <Loader2 className="animate-spin" /> : null}

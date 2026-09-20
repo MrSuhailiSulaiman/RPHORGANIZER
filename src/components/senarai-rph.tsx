@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
-import { kumpulanMingguRph, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { kumpulanMingguRph, mingguSemasaDalam, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import { hantarPadamBerperingkat, hantarPadamRph, hantarPadamSemuaRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 
@@ -26,6 +27,7 @@ export function SenaraiRph() {
   const [padamProgres, setPadamProgres] = useState<{ siap: number; jumlah: number } | null>(null);
   const [sedangPdf, setSedangPdf] = useState<number | null>(null);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
+  const [mingguTapis, setMingguTapis] = useState<number | "semua" | null>(null);
 
   async function muat() {
     const cap = Date.now();
@@ -69,6 +71,17 @@ export function SenaraiRph() {
   );
 
   const kumpulanMinggu = useMemo(() => kumpulanMingguRph(rph), [rph]);
+  const mingguLalai = mingguSemasaDalam(kumpulanMinggu) ?? "semua";
+  const mingguAktif =
+    mingguTapis === "semua" ||
+    (typeof mingguTapis === "number" && kumpulanMinggu.some((kumpul) => kumpul.minggu === mingguTapis))
+      ? mingguTapis
+      : mingguLalai;
+  const kumpulanDipapar =
+    mingguAktif === "semua"
+      ? kumpulanMinggu
+      : kumpulanMinggu.filter((kumpul) => kumpul.minggu === mingguAktif);
+  const rphDipapar = kumpulanDipapar.flatMap((kumpul) => kumpul.item);
 
   async function padamRph(id: string) {
     if (padamId === id || sedangPukal) return;
@@ -279,13 +292,19 @@ export function SenaraiRph() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-heading text-lg font-medium">RPH mengikut minggu</h2>
             <div className="flex flex-wrap items-center gap-3">
+              <TapisMingguRph
+                kumpulan={kumpulanMinggu}
+                nilai={mingguAktif}
+                termasukSemua
+                onChange={setMingguTapis}
+              />
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
                   disabled={sedangPukal}
-                  checked={Boolean(rph.length) && dipilih.length === rph.length}
-                  onChange={(event) => togolSemua(rph.map((item) => item.id), event.target.checked)}
+                  checked={Boolean(rphDipapar.length) && rphDipapar.every((item) => dipilih.includes(item.id))}
+                  onChange={(event) => togolSemua(rphDipapar.map((item) => item.id), event.target.checked)}
                 />
                 Pilih semua
               </label>
@@ -305,7 +324,8 @@ export function SenaraiRph() {
               </Button>
             </div>
           </div>
-          {kumpulanMinggu.map((kumpul) => {
+          {kumpulanDipapar.length ? (
+          kumpulanDipapar.map((kumpul) => {
             const idMinggu = kumpul.item.map((item) => item.id);
             const bilDipilih = idMinggu.filter((id) => dipilih.includes(id)).length;
             return (
@@ -404,7 +424,12 @@ export function SenaraiRph() {
               </CardContent>
             </Card>
             );
-          })}
+          })
+          ) : (
+            <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              Tiada RPH untuk minggu yang dipilih.
+            </p>
+          )}
         </div>
       ) : null}
 

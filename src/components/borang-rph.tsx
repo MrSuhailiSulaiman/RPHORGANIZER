@@ -10,7 +10,8 @@ import { JadualRph } from "@/components/jadual-rph";
 import { tarikhUntukHari } from "@/lib/jadual/parse";
 import { borangKosong, dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
-import { rphMingguSemasa } from "@/lib/rph/tahun";
+import { kumpulanMingguRph, rphMingguSemasa, type KumpulanMingguRph } from "@/lib/rph/tahun";
+import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import type { RphRekod, RphStandard } from "@/lib/rph/types";
 import type { SesiPdp } from "@/lib/jadual/types";
 
@@ -28,6 +29,7 @@ export function BorangRph({
   const [sedangPadam, setSedangPadam] = useState(false);
   const [sedangJana, setSedangJana] = useState(false);
   const [navMinggu, setNavMinggu] = useState<ReturnType<typeof rphMingguSemasa<RphRekod>>>(null);
+  const [kumpulanMinggu, setKumpulanMinggu] = useState<KumpulanMingguRph<RphRekod>[]>([]);
   const janaMasa = useRef(0);
   const janaTunda = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,13 +47,16 @@ export function BorangRph({
           const senaraiJson = await senaraiRes.json();
           if (!res.ok) throw new Error(json.ralat ?? "RPH tidak dijumpai.");
           if (hidup) {
+            const senarai = (senaraiJson.rph ?? []) as RphRekod[];
             setBorang(dariRekod(json.rph));
-            setNavMinggu(rphMingguSemasa((senaraiJson.rph ?? []) as RphRekod[], rphId));
+            setKumpulanMinggu(kumpulanMingguRph(senarai));
+            setNavMinggu(rphMingguSemasa(senarai, rphId));
             window.scrollTo(0, 0);
           }
           return;
         }
         if (hidup) setNavMinggu(null);
+        if (hidup) setKumpulanMinggu([]);
         if (sesiId) {
           const res = await fetch(`/api/sesi/${sesiId}`);
           const json = await res.json();
@@ -208,7 +213,17 @@ export function BorangRph({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <TapisMingguRph
+          kumpulan={kumpulanMinggu}
+          nilai={navMinggu?.minggu ?? kumpulanMinggu[0]?.minggu ?? "semua"}
+          onChange={(pilih) => {
+            if (pilih === "semua") return;
+            const kumpul = kumpulanMinggu.find((item) => item.minggu === pilih);
+            const id = kumpul?.item[0]?.id;
+            if (id && id !== rphId) router.push(`/rph/${id}`);
+          }}
+        />
         <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
           {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
           {sedangJana ? "Menjana RPH..." : "Generate RPH"}
