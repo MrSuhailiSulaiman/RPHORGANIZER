@@ -40,9 +40,21 @@ export function PaparMingguRph() {
           (minggu > 0 ? kumpulan.find((item) => item.minggu === minggu) : null) ??
           kumpulan.find((item) => item.item.some((row) => ids.includes(row.id))) ??
           kumpulan[0];
+        const idMinggu = (sasaran?.item.map((item) => item.id).filter(Boolean) ?? ids).filter(Boolean);
+
+        let penuh: RphRekod[] = [];
+        if (idMinggu.length) {
+          const penuhRes = await fetch(`/api/rph?ids=${encodeURIComponent(idMinggu.join(","))}`, {
+            cache: "no-store",
+          });
+          const penuhJson = await penuhRes.json();
+          if (!penuhRes.ok) throw new Error(penuhJson.ralat ?? "Gagal memuatkan RPH minggu ini.");
+          penuh = ((penuhJson.rph ?? []) as RphRekod[]).sort(bandingSesiRph);
+        }
+
         if (hidup) {
           setKumpulanMinggu(kumpulan);
-          setBorang((sasaran?.item ?? []).map(dariRekod));
+          setBorang(penuh.map(dariRekod));
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Gagal memuatkan RPH minggu ini.");
