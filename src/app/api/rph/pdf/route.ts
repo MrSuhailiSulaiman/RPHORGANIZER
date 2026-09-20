@@ -40,16 +40,12 @@ export async function POST(request: Request) {
     const minggu = Number(body.minggu);
     const nomborMinggu = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
     const pdf = await binaPdfRphMinggu({ rekod, minggu: nomborMinggu });
-    const nama = namaFailPdfMinggu(
-      nomborMinggu,
-      typeof body.tarikh_mula === "string" ? body.tarikh_mula : rekod[0]?.tarikh,
-      typeof body.tarikh_tamat === "string" ? body.tarikh_tamat : rekod[rekod.length - 1]?.tarikh
-    );
+    const nama = namaFailPdfMinggu(nomborMinggu, auth.sesi.nama);
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${nama}"`,
+        "Content-Disposition": `attachment; filename="${nama}"; filename*=UTF-8''${encodeURIComponent(nama)}`,
         "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });

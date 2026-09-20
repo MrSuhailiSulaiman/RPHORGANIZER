@@ -90,11 +90,15 @@ function senaraiNombor(nilai: string[]) {
     .join("\n");
 }
 
-export function namaFailPdfMinggu(minggu: number, mula?: string | null, tamat?: string | null) {
-  const julat = [mula, tamat && tamat !== mula ? tamat : ""]
-    .filter(Boolean)
-    .join("_hingga_");
-  return `RPH-Minggu-${String(minggu).padStart(2, "0")}${julat ? `-${julat}` : ""}.pdf`;
+export function namaFailPdfMinggu(minggu: number, namaPengguna?: string | null) {
+  const nombor = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
+  const nama = (namaPengguna ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || "PENGGUNA";
+  return `M${nombor} - ${nama}.pdf`;
 }
 
 class Pelukis {

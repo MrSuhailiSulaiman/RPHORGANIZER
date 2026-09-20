@@ -27,7 +27,7 @@ export async function muatTurunPdfMinggu(params: {
   const blob = await res.blob();
   const nama =
     res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ??
-    `RPH-Minggu-${String(params.minggu).padStart(2, "0")}.pdf`;
+    `M${params.minggu} - PENGGUNA.pdf`;
   const url = URL.createObjectURL(blob);
   const pautan = document.createElement("a");
   pautan.href = url;
