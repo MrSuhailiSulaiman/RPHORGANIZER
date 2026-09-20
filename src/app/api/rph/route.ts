@@ -44,6 +44,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Record<string, unknown>;
+    const ids = Array.isArray(payload.ids) ? payload.ids.map((id) => String(id).trim()).filter(Boolean) : [];
+    if (ids.length) {
+      await connection();
+      const cfg = await kunciServisSupabase();
+      if (!cfg.url || !cfg.key) {
+        return NextResponse.json(
+          { ralat: "Padam RPH memerlukan kunci servis Supabase." },
+          { status: 500, headers: { "Cache-Control": "no-store" } }
+        );
+      }
+      const bil = await padamRphPukal(ids, cfg);
+      return NextResponse.json({ ok: true, bil }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (!payload.mata_pelajaran || !payload.kelas || !payload.hari) {
       return NextResponse.json(
         { ralat: "Kelas, hari, dan mata pelajaran diperlukan." },

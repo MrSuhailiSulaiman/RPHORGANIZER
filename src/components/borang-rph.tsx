@@ -251,7 +251,7 @@ export function BorangRph({
     try {
       await hantarPadamRph([borang.id]);
       toast.success("Rekod RPH dipadam.");
-      router.push("/rph");
+      router.replace("/rph");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");

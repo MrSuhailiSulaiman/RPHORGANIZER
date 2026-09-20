@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ClipboardList, Download, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
+import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 
 export function SenaraiRph() {
   const [sesi, setSesi] = useState<SesiPdp[]>([]);
@@ -22,6 +23,7 @@ export function SenaraiRph() {
   const [padamId, setPadamId] = useState<string | null>(null);
   const [dipilih, setDipilih] = useState<string[]>([]);
   const [sedangPukal, setSedangPukal] = useState(false);
+  const [sedangPdf, setSedangPdf] = useState<number | null>(null);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
   async function muat() {
@@ -89,14 +91,16 @@ export function SenaraiRph() {
   }, [rph]);
 
   async function padamRph(id: string) {
-    if (padamId) return;
+    if (padamId === id || sedangPukal) return;
     setPadamId(id);
+    setRph((senarai) => senarai.filter((item) => item.id !== id));
+    setDipilih((senarai) => senarai.filter((item) => item !== id));
     try {
       await hantarPadamRph([id]);
-      await muat();
-      setDipilih((senarai) => senarai.filter((item) => item !== id));
       toast.success("Rekod RPH dipadam.");
+      void muat().catch(() => undefined);
     } catch (error) {
+      await muat().catch(() => undefined);
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
       setPadamId(null);
@@ -116,17 +120,49 @@ export function SenaraiRph() {
   }
 
   async function padamPukal() {
-    if (!dipilih.length || sedangPukal || padamId) return;
+    if (!dipilih.length || sedangPukal) return;
+    const sasaran = [...dipilih];
+    const buang = new Set(sasaran);
     setSedangPukal(true);
+    setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
+    setDipilih([]);
     try {
-      const bil = await hantarPadamRph(dipilih);
-      await muat();
-      setDipilih([]);
+      const bil = await hantarPadamRph(sasaran);
       toast.success(`${bil} rekod RPH dipadam.`);
+      void muat().catch(() => undefined);
     } catch (error) {
+      await muat().catch(() => undefined);
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
       setSedangPukal(false);
+    }
+  }
+
+  async function muatPdfMinggu(kumpul: {
+    minggu: number;
+    tarikh_mula?: string | null;
+    tarikh_tamat?: string | null;
+    item: RphRekod[];
+  }) {
+    if (sedangPdf != null) return;
+    const ids = kumpul.item.map((item) => item.id).filter(Boolean);
+    if (!ids.length) {
+      toast.error("Tiada sesi RPH pada minggu ini.");
+      return;
+    }
+    setSedangPdf(kumpul.minggu);
+    try {
+      await muatTurunPdfMinggu({
+        ids,
+        minggu: kumpul.minggu,
+        tarikh_mula: kumpul.tarikh_mula,
+        tarikh_tamat: kumpul.tarikh_tamat,
+      });
+      toast.success(`PDF RPH Minggu ${kumpul.minggu} dimuat turun.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memuat turun PDF RPH.");
+    } finally {
+      setSedangPdf(null);
     }
   }
 
@@ -240,7 +276,7 @@ export function SenaraiRph() {
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={!dipilih.length || sedangPukal || Boolean(padamId)}
+                disabled={!dipilih.length || sedangPukal}
                 onClick={() => void padamPukal()}
               >
                 {sedangPukal ? <Loader2 className="animate-spin" /> : <Trash2 />}
@@ -265,15 +301,27 @@ export function SenaraiRph() {
                       {` · ${kumpul.item.length} sesi`}
                     </CardDescription>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      checked={idMinggu.length > 0 && bilDipilih === idMinggu.length}
-                      onChange={(event) => togolSemua(idMinggu, event.target.checked)}
-                    />
-                    Pilih minggu
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={sedangPdf != null || !idMinggu.length}
+                      onClick={() => void muatPdfMinggu(kumpul)}
+                    >
+                      {sedangPdf === kumpul.minggu ? <Loader2 className="animate-spin" /> : <Download />}
+                      Download RPH
+                    </Button>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={idMinggu.length > 0 && bilDipilih === idMinggu.length}
+                        onChange={(event) => togolSemua(idMinggu, event.target.checked)}
+                      />
+                      Pilih minggu
+                    </label>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="grid gap-2">

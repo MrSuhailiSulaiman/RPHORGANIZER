@@ -1,3 +1,4 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "./types";
@@ -62,17 +63,30 @@ function mapRph(row: Record<string, unknown>): RphRekod {
 
 const RPH_PADAM = "__DIPADAM__";
 
+const RUANGAN_SENARAI =
+  "id,sesi_id,tarikh,hari,masa,tingkatan,kelas,mata_pelajaran,bidang_kod,bidang_nama,sk_kod,sk_tajuk,created_at,updated_at";
+
 export async function senaraiRph(): Promise<RphRekod[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = createAdminClient();
-  const { data, error } = await supabase.from("rph").select("*").order("tarikh", { ascending: false });
-  if (error) {
-    if (tableMissing(error)) return [];
-    throw skemaRalat(error);
+  const semua: RphRekod[] = [];
+  for (let dari = 0; dari < 50000; dari += 1000) {
+    const { data, error } = await supabase
+      .from("rph")
+      .select(RUANGAN_SENARAI)
+      .order("tarikh", { ascending: false })
+      .range(dari, dari + 999);
+    if (error) {
+      if (tableMissing(error)) return [];
+      throw skemaRalat(error);
+    }
+    const baris = (data ?? [])
+      .map((row) => mapRph(row as Record<string, unknown>))
+      .filter((row) => row.mata_pelajaran !== RPH_PADAM);
+    semua.push(...baris);
+    if ((data?.length ?? 0) < 1000) break;
   }
-  return (data ?? [])
-    .map((row) => mapRph(row as Record<string, unknown>))
-    .filter((row) => row.mata_pelajaran !== RPH_PADAM);
+  return semua;
 }
 
 export async function getRph(id: string): Promise<RphRekod | null> {
@@ -87,6 +101,29 @@ export async function getRph(id: string): Promise<RphRekod | null> {
   const rekod = mapRph(data as Record<string, unknown>);
   if (rekod.mata_pelajaran === RPH_PADAM) return null;
   return rekod;
+}
+
+export async function getRphMengikutId(ids: string[]): Promise<RphRekod[]> {
+  if (!isSupabaseConfigured()) return [];
+  const bersih = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (!bersih.length) return [];
+  const supabase = createAdminClient();
+  const semua: RphRekod[] = [];
+  for (let i = 0; i < bersih.length; i += 50) {
+    const bahagian = bersih.slice(i, i + 50);
+    const { data, error } = await supabase.from("rph").select("*").in("id", bahagian);
+    if (error) {
+      if (tableMissing(error)) return [];
+      throw skemaRalat(error);
+    }
+    semua.push(
+      ...(data ?? [])
+        .map((row) => mapRph(row as Record<string, unknown>))
+        .filter((row) => row.mata_pelajaran !== RPH_PADAM)
+    );
+  }
+  const susunan = new Map(bersih.map((id, indeks) => [id, indeks]));
+  return semua.sort((a, b) => (susunan.get(a.id) ?? 0) - (susunan.get(b.id) ?? 0));
 }
 
 export async function simpanRph(payload: Record<string, unknown>) {
@@ -253,12 +290,34 @@ function kunciPadam(kunci?: KunciSupabase): KunciSupabase {
   return { url: cfg.url, key: cfg.key };
 }
 
+function klienPadam(auth: KunciSupabase): SupabaseClient {
+  return createClient(auth.url, auth.key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${auth.key}` } },
+  });
+}
+
 function kepalaPadam(key: string) {
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
-    Prefer: "return=minimal,count=exact",
+    Prefer: "return=representation",
   };
+}
+
+async function masihAdaRph(supabase: SupabaseClient, ids: string[]) {
+  if (!ids.length) return [];
+  const { data, error } = await supabase.from("rph").select("id,mata_pelajaran").in("id", ids);
+  if (error) throw skemaRalat(error);
+  return (data ?? []).filter((row) => row.mata_pelajaran !== RPH_PADAM).map((row) => String(row.id));
+}
+
+async function sorokRph(supabase: SupabaseClient, ids: string[]) {
+  for (const id of ids) {
+    await supabase.rpc("simpan_rph", {
+      payload: { id, mata_pelajaran: RPH_PADAM, kelas: "-", hari: "ISNIN" },
+    });
+  }
 }
 
 async function senaraiSemuaIdRph(kunci: KunciSupabase) {
@@ -282,10 +341,15 @@ export async function bilanganSemuaRph(kunci?: KunciSupabase) {
 }
 
 async function padamSemuaBaris(kunci: KunciSupabase) {
+  const kepala = {
+    apikey: kunci.key,
+    Authorization: `Bearer ${kunci.key}`,
+    Prefer: "return=minimal",
+  };
   const rpc = await fetch(`${kunci.url}/rest/v1/rpc/padam_semua_rph`, {
     method: "POST",
     headers: {
-      ...kepalaPadam(kunci.key),
+      ...kepala,
       "Content-Type": "application/json",
     },
     body: "{}",
@@ -295,7 +359,7 @@ async function padamSemuaBaris(kunci: KunciSupabase) {
 
   const res = await fetch(`${kunci.url}/rest/v1/rph?id=not.is.null`, {
     method: "DELETE",
-    headers: kepalaPadam(kunci.key),
+    headers: kepala,
     cache: "no-store",
   });
   if (!res.ok) throw skemaRalat({ message: await res.text() });
@@ -304,8 +368,8 @@ async function padamSemuaBaris(kunci: KunciSupabase) {
 
 async function padamId(kunci: KunciSupabase, ids: string[]) {
   if (!ids.length) return 0;
-  const senarai = ids.join(",");
-  const res = await fetch(`${kunci.url}/rest/v1/rph?id=in.(${senarai})`, {
+  const senarai = encodeURIComponent(`(${ids.map((id) => `"${id}"`).join(",")})`);
+  const res = await fetch(`${kunci.url}/rest/v1/rph?id=in.${senarai}`, {
     method: "DELETE",
     headers: kepalaPadam(kunci.key),
     cache: "no-store",
@@ -315,49 +379,7 @@ async function padamId(kunci: KunciSupabase, ids: string[]) {
 }
 
 export async function padamRph(id: string, kunci?: KunciSupabase) {
-  const auth = kunciPadam(kunci);
-  if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
-  const bersih = id.trim();
-  if (!bersih) throw new Error("Id RPH tidak sah.");
-
-  const res = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}`, {
-    method: "DELETE",
-    headers: kepalaPadam(auth.key),
-    cache: "no-store",
-  });
-  if (!res.ok) throw skemaRalat({ message: await res.text() });
-
-  const semak = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id,mata_pelajaran`, {
-    headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
-    cache: "no-store",
-  });
-  if (!semak.ok) throw skemaRalat({ message: await semak.text() });
-  const tinggal = (await semak.json()) as { id?: string; mata_pelajaran?: string }[];
-  if (!tinggal.length || tinggal.every((row) => row.mata_pelajaran === RPH_PADAM)) return;
-
-  const sorok = await fetch(`${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}`, {
-    method: "PATCH",
-    headers: {
-      ...kepalaPadam(auth.key),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ mata_pelajaran: RPH_PADAM }),
-    cache: "no-store",
-  });
-  if (!sorok.ok) throw skemaRalat({ message: await sorok.text() });
-
-  const semakSemula = await fetch(
-    `${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(bersih)}&select=id,mata_pelajaran`,
-    {
-      headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
-      cache: "no-store",
-    }
-  );
-  if (!semakSemula.ok) throw skemaRalat({ message: await semakSemula.text() });
-  const baki = (await semakSemula.json()) as { mata_pelajaran?: string }[];
-  if (baki.some((row) => row.mata_pelajaran !== RPH_PADAM)) {
-    throw new Error("Rekod RPH tidak dapat dipadam daripada pangkalan data.");
-  }
+  await padamRphPukal([id], kunci);
 }
 
 export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
@@ -365,40 +387,29 @@ export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
   const bersih = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (!bersih.length) return 0;
+  const supabase = klienPadam(auth);
 
-  for (let i = 0; i < bersih.length; i += 50) {
-    await padamId(auth, bersih.slice(i, i + 50));
-  }
+  await supabase.rpc("padam_rph_ids", { ids: bersih });
+  let tinggal = await masihAdaRph(supabase, bersih);
+  if (!tinggal.length) return bersih.length;
 
-  const tinggal: { id?: string; mata_pelajaran?: string }[] = [];
-  for (let i = 0; i < bersih.length; i += 50) {
-    const bahagian = bersih.slice(i, i + 50);
-    const semak = await fetch(
-      `${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})&select=id,mata_pelajaran`,
-      {
-        headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` },
-        cache: "no-store",
-      }
-    );
-    if (!semak.ok) throw skemaRalat({ message: await semak.text() });
-    const data = (await semak.json()) as { id?: string; mata_pelajaran?: string }[];
-    tinggal.push(...data.filter((row) => row.mata_pelajaran !== RPH_PADAM));
+  for (let i = 0; i < tinggal.length; i += 50) {
+    const bahagian = tinggal.slice(i, i + 50);
+    await supabase.from("rph").delete().in("id", bahagian);
   }
+  tinggal = await masihAdaRph(supabase, bersih);
+  if (!tinggal.length) return bersih.length;
+
+  for (let i = 0; i < tinggal.length; i += 50) {
+    await padamId(auth, tinggal.slice(i, i + 50));
+  }
+  tinggal = await masihAdaRph(supabase, bersih);
+  if (!tinggal.length) return bersih.length;
+
+  await sorokRph(supabase, tinggal);
+  tinggal = await masihAdaRph(supabase, bersih);
   if (tinggal.length) {
-    const idsTinggal = tinggal.map((row) => String(row.id)).filter(Boolean);
-    for (let i = 0; i < idsTinggal.length; i += 50) {
-      const bahagian = idsTinggal.slice(i, i + 50);
-      const sorok = await fetch(`${auth.url}/rest/v1/rph?id=in.(${bahagian.join(",")})`, {
-        method: "PATCH",
-        headers: {
-          ...kepalaPadam(auth.key),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ mata_pelajaran: RPH_PADAM }),
-        cache: "no-store",
-      });
-      if (!sorok.ok) throw skemaRalat({ message: await sorok.text() });
-    }
+    throw new Error("Rekod RPH tidak dapat dipadam daripada pangkalan data.");
   }
   return bersih.length;
 }
