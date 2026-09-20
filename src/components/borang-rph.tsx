@@ -224,7 +224,7 @@ export function BorangRph({
         {borang.id ? (
           <Button type="button" variant="destructive" onClick={() => void padam()} disabled={sedangPadam}>
             {sedangPadam ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            Padam RPH
+            {sedangPadam ? "Memadam..." : "Padam RPH"}
           </Button>
         ) : null}
         <Button type="button" variant="outline" onClick={() => window.print()}>

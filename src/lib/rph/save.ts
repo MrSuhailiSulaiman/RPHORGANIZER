@@ -421,7 +421,7 @@ export async function padamSemuaRph(kunci?: KunciSupabase) {
   const sebelum = await senaraiSemuaIdRph(auth);
   if (!sebelum.length) return 0;
 
-  for (let cubaan = 0; cubaan < 6; cubaan += 1) {
+  for (let cubaan = 0; cubaan < 80; cubaan += 1) {
     await padamSemuaBaris(auth);
     let ids = await senaraiSemuaIdRph(auth);
     if (!ids.length) return sebelum.length;

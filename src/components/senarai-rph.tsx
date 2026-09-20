@@ -12,7 +12,7 @@ import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { kumpulanMingguRph, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
-import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
+import { hantarPadamRph, hantarPadamSemuaRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 
 export function SenaraiRph() {
@@ -99,14 +99,15 @@ export function SenaraiRph() {
   }
 
   async function padamPukal() {
-    if (!dipilih.length || sedangPukal) return;
+    if (!dipilih.length || sedangPukal || padamId) return;
     const sasaran = [...dipilih];
-    const buang = new Set(sasaran);
+    const padamSemua = sasaran.length === rph.length;
     setSedangPukal(true);
-    setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
-    setDipilih([]);
     try {
-      const bil = await hantarPadamRph(sasaran);
+      const bil = padamSemua ? await hantarPadamSemuaRph() : await hantarPadamRph(sasaran);
+      const buang = new Set(sasaran);
+      setRph((senarai) => (padamSemua ? [] : senarai.filter((item) => !buang.has(item.id))));
+      setDipilih([]);
       toast.success(`${bil} rekod RPH dipadam.`);
       void muat().catch(() => undefined);
     } catch (error) {
@@ -204,7 +205,20 @@ export function SenaraiRph() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      {sedangPukal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <p className="flex items-center gap-3 rounded-lg border bg-card px-5 py-4 text-sm shadow-lg">
+            <Loader2 className="size-5 animate-spin" />
+            Memadam RPH... Sila tunggu sehingga selesai.
+          </p>
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>Jana RPH setahun</CardTitle>
@@ -223,7 +237,7 @@ export function SenaraiRph() {
               className="w-44"
             />
           </label>
-          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana}>
+          <Button type="button" onClick={() => void janaRph()} disabled={sedangJana || sedangPukal}>
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {sedangJana ? "Menjana RPH..." : "Generate RPH"}
           </Button>
@@ -246,6 +260,7 @@ export function SenaraiRph() {
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
+                  disabled={sedangPukal}
                   checked={Boolean(rph.length) && dipilih.length === rph.length}
                   onChange={(event) => togolSemua(rph.map((item) => item.id), event.target.checked)}
                 />
@@ -255,11 +270,15 @@ export function SenaraiRph() {
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={!dipilih.length || sedangPukal}
+                disabled={!dipilih.length || sedangPukal || Boolean(padamId)}
                 onClick={() => void padamPukal()}
               >
                 {sedangPukal ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                {dipilih.length ? `Padam ${dipilih.length} rekod` : "Padam dipilih"}
+                {sedangPukal
+                  ? "Memadam..."
+                  : dipilih.length
+                    ? `Padam ${dipilih.length} rekod`
+                    : "Padam dipilih"}
               </Button>
             </div>
           </div>
@@ -301,6 +320,7 @@ export function SenaraiRph() {
                       <input
                         type="checkbox"
                         className="size-4 accent-primary"
+                        disabled={sedangPukal}
                         checked={idMinggu.length > 0 && bilDipilih === idMinggu.length}
                         onChange={(event) => togolSemua(idMinggu, event.target.checked)}
                       />
@@ -319,6 +339,7 @@ export function SenaraiRph() {
                       <input
                         type="checkbox"
                         className="mt-1 size-4 shrink-0 accent-primary"
+                        disabled={sedangPukal}
                         checked={dipilih.includes(item.id)}
                         onChange={() => togolDipilih(item.id)}
                         aria-label={`Pilih ${item.mata_pelajaran} ${item.tarikh ?? ""}`}

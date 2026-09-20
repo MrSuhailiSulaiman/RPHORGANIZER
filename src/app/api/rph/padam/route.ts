@@ -6,7 +6,7 @@ import { padamRph, padamRphPukal } from "@/lib/rph/save";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, {
