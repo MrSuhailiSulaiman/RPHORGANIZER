@@ -5,7 +5,7 @@ import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 function keRph(request: Request, query: string) {
   const path = query ? `/rph?${query}` : "/rph";

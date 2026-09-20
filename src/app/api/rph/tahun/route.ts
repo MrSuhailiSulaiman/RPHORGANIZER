@@ -5,7 +5,7 @@ import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 export const fetchCache = "force-no-store";
 
 function json(data: unknown, status = 200) {

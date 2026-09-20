@@ -12,16 +12,16 @@
       "maxDuration": 300
     },
     "src/app/api/rph/tahun/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/api/rph/padam/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/api/rph/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/rph/padam/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/api/rph/pdf/route.ts": {
       "maxDuration": 60

@@ -12,7 +12,7 @@ import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
 import { kumpulanMingguRph, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
-import { hantarPadamRph, hantarPadamSemuaRph } from "@/lib/rph/padam-pelayar";
+import { hantarPadamBerperingkat, hantarPadamRph, hantarPadamSemuaRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 
 export function SenaraiRph() {
@@ -23,6 +23,7 @@ export function SenaraiRph() {
   const [padamId, setPadamId] = useState<string | null>(null);
   const [dipilih, setDipilih] = useState<string[]>([]);
   const [sedangPukal, setSedangPukal] = useState(false);
+  const [padamProgres, setPadamProgres] = useState<{ siap: number; jumlah: number } | null>(null);
   const [sedangPdf, setSedangPdf] = useState<number | null>(null);
   const [tarikhMula, setTarikhMula] = useState(tarikhMulaTahunAsal());
 
@@ -103,10 +104,29 @@ export function SenaraiRph() {
     const sasaran = [...dipilih];
     const padamSemua = sasaran.length === rph.length;
     setSedangPukal(true);
+    setPadamProgres({ siap: 0, jumlah: sasaran.length });
     try {
-      const bil = padamSemua ? await hantarPadamSemuaRph() : await hantarPadamRph(sasaran);
-      const buang = new Set(sasaran);
-      setRph((senarai) => (padamSemua ? [] : senarai.filter((item) => !buang.has(item.id))));
+      let bil = 0;
+      const kemaskini = (siap: number, jumlah: number) => {
+        setPadamProgres({ siap, jumlah });
+        const buang = new Set(sasaran.slice(0, siap));
+        setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
+      };
+      if (padamSemua) {
+        try {
+          bil = await hantarPadamSemuaRph();
+          setRph([]);
+          setPadamProgres({ siap: sasaran.length, jumlah: sasaran.length });
+        } catch {
+          bil = await hantarPadamBerperingkat(sasaran, kemaskini);
+        }
+      } else if (sasaran.length > 25) {
+        bil = await hantarPadamBerperingkat(sasaran, kemaskini);
+      } else {
+        bil = await hantarPadamRph(sasaran);
+        const buang = new Set(sasaran);
+        setRph((senarai) => senarai.filter((item) => !buang.has(item.id)));
+      }
       setDipilih([]);
       toast.success(`${bil} rekod RPH dipadam.`);
       void muat().catch(() => undefined);
@@ -115,6 +135,7 @@ export function SenaraiRph() {
       toast.error(error instanceof Error ? error.message : "Gagal memadam RPH.");
     } finally {
       setSedangPukal(false);
+      setPadamProgres(null);
     }
   }
 
@@ -215,7 +236,9 @@ export function SenaraiRph() {
         >
           <p className="flex items-center gap-3 rounded-lg border bg-card px-5 py-4 text-sm shadow-lg">
             <Loader2 className="size-5 animate-spin" />
-            Memadam RPH... Sila tunggu sehingga selesai.
+            {padamProgres
+              ? `Memadam RPH... ${padamProgres.siap}/${padamProgres.jumlah}`
+              : "Memadam RPH... Sila tunggu sehingga selesai."}
           </p>
         </div>
       ) : null}

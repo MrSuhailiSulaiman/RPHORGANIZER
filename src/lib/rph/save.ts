@@ -297,26 +297,47 @@ function klienPadam(auth: KunciSupabase): SupabaseClient {
   });
 }
 
-function kepalaPadam(key: string) {
+function kepalaPadam(key: string, representation = false) {
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
-    Prefer: "return=representation",
+    Prefer: representation ? "return=representation" : "return=minimal,count=exact",
   };
+}
+
+async function fetchPadam(url: string, init: RequestInit, ms = 12000) {
+  try {
+    return await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(ms) });
+  } catch {
+    return null;
+  }
 }
 
 async function masihAdaRph(supabase: SupabaseClient, ids: string[]) {
   if (!ids.length) return [];
-  const { data, error } = await supabase.from("rph").select("id,mata_pelajaran").in("id", ids);
-  if (error) throw skemaRalat(error);
-  return (data ?? []).filter((row) => row.mata_pelajaran !== RPH_PADAM).map((row) => String(row.id));
+  const tinggal: string[] = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const bahagian = ids.slice(i, i + 40);
+    const { data, error } = await supabase.from("rph").select("id,mata_pelajaran").in("id", bahagian);
+    if (error) throw skemaRalat(error);
+    tinggal.push(
+      ...(data ?? [])
+        .filter((row) => row.mata_pelajaran !== RPH_PADAM)
+        .map((row) => String(row.id))
+    );
+  }
+  return tinggal;
 }
 
 async function sorokRph(supabase: SupabaseClient, ids: string[]) {
-  for (const id of ids) {
-    await supabase.rpc("simpan_rph", {
-      payload: { id, mata_pelajaran: RPH_PADAM, kelas: "-", hari: "ISNIN" },
-    });
+  for (let i = 0; i < ids.length; i += 8) {
+    await Promise.all(
+      ids.slice(i, i + 8).map((id) =>
+        supabase.rpc("simpan_rph", {
+          payload: { id, mata_pelajaran: RPH_PADAM, kelas: "-", hari: "ISNIN" },
+        })
+      )
+    );
   }
 }
 
@@ -324,11 +345,14 @@ async function senaraiSemuaIdRph(kunci: KunciSupabase) {
   if (!kunci.url || !kunci.key) return [];
   const ids: string[] = [];
   for (let dari = 0; dari < 50000; dari += 1000) {
-    const res = await fetch(`${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}&limit=1000&offset=${dari}`, {
-      headers: { apikey: kunci.key, Authorization: `Bearer ${kunci.key}` },
-      cache: "no-store",
-    });
-    if (!res.ok) throw skemaRalat({ message: await res.text() });
+    const res = await fetchPadam(
+      `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}&limit=1000&offset=${dari}`,
+      { headers: { apikey: kunci.key, Authorization: `Bearer ${kunci.key}` } },
+      15000
+    );
+    if (!res?.ok) {
+      throw skemaRalat({ message: res ? await res.text() : "Tidak dapat membaca senarai RPH." });
+    }
     const data = (await res.json()) as { id?: string }[];
     ids.push(...data.map((row) => String(row.id)).filter((id) => id && id !== "undefined"));
     if (data.length < 1000) break;
@@ -336,45 +360,61 @@ async function senaraiSemuaIdRph(kunci: KunciSupabase) {
   return ids;
 }
 
+async function bilanganRph(kunci: KunciSupabase) {
+  const res = await fetchPadam(
+    `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}`,
+    {
+      method: "HEAD",
+      headers: {
+        apikey: kunci.key,
+        Authorization: `Bearer ${kunci.key}`,
+        Prefer: "count=exact",
+        Range: "0-0",
+      },
+    },
+    10000
+  );
+  const julat = res?.headers.get("content-range") ?? "";
+  const padanan = /\/(\d+)\s*$/.exec(julat);
+  if (padanan) return Number(padanan[1]);
+  return (await senaraiSemuaIdRph(kunci)).length;
+}
+
 export async function bilanganSemuaRph(kunci?: KunciSupabase) {
-  return (await senaraiSemuaIdRph(kunciPadam(kunci))).length;
+  return bilanganRph(kunciPadam(kunci));
 }
 
 async function padamSemuaBaris(kunci: KunciSupabase) {
-  const kepala = {
-    apikey: kunci.key,
-    Authorization: `Bearer ${kunci.key}`,
-    Prefer: "return=minimal",
-  };
-  const rpc = await fetch(`${kunci.url}/rest/v1/rpc/padam_semua_rph`, {
-    method: "POST",
-    headers: {
-      ...kepala,
-      "Content-Type": "application/json",
+  const kepala = kepalaPadam(kunci.key);
+  const rpc = await fetchPadam(
+    `${kunci.url}/rest/v1/rpc/padam_semua_rph`,
+    {
+      method: "POST",
+      headers: { ...kepala, "Content-Type": "application/json" },
+      body: "{}",
     },
-    body: "{}",
-    cache: "no-store",
-  });
-  if (rpc.ok) return Number((await rpc.text()) || "0");
+    15000
+  );
+  if (rpc?.ok) return Number((await rpc.text()).replace(/[^\d-]/g, "") || "0");
 
-  const res = await fetch(`${kunci.url}/rest/v1/rph?id=not.is.null`, {
-    method: "DELETE",
-    headers: kepala,
-    cache: "no-store",
-  });
-  if (!res.ok) throw skemaRalat({ message: await res.text() });
-  return bilPadam(res);
+  const res = await fetchPadam(
+    `${kunci.url}/rest/v1/rph?id=not.is.null`,
+    { method: "DELETE", headers: kepala },
+    15000
+  );
+  if (res?.ok) return bilPadam(res);
+  return 0;
 }
 
 async function padamId(kunci: KunciSupabase, ids: string[]) {
   if (!ids.length) return 0;
   const senarai = encodeURIComponent(`(${ids.map((id) => `"${id}"`).join(",")})`);
-  const res = await fetch(`${kunci.url}/rest/v1/rph?id=in.${senarai}`, {
-    method: "DELETE",
-    headers: kepalaPadam(kunci.key),
-    cache: "no-store",
-  });
-  if (!res.ok) throw skemaRalat({ message: await res.text() });
+  const res = await fetchPadam(
+    `${kunci.url}/rest/v1/rph?id=in.${senarai}`,
+    { method: "DELETE", headers: kepalaPadam(kunci.key) },
+    15000
+  );
+  if (!res?.ok) return 0;
   return bilPadam(res);
 }
 
@@ -389,19 +429,20 @@ export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
   if (!bersih.length) return 0;
   const supabase = klienPadam(auth);
 
-  await supabase.rpc("padam_rph_ids", { ids: bersih });
+  for (let i = 0; i < bersih.length; i += 80) {
+    await supabase.rpc("padam_rph_ids", { ids: bersih.slice(i, i + 80) });
+  }
   let tinggal = await masihAdaRph(supabase, bersih);
   if (!tinggal.length) return bersih.length;
 
-  for (let i = 0; i < tinggal.length; i += 50) {
-    const bahagian = tinggal.slice(i, i + 50);
-    await supabase.from("rph").delete().in("id", bahagian);
+  for (let i = 0; i < tinggal.length; i += 40) {
+    await supabase.from("rph").delete().in("id", tinggal.slice(i, i + 40));
   }
   tinggal = await masihAdaRph(supabase, bersih);
   if (!tinggal.length) return bersih.length;
 
-  for (let i = 0; i < tinggal.length; i += 50) {
-    await padamId(auth, tinggal.slice(i, i + 50));
+  for (let i = 0; i < tinggal.length; i += 40) {
+    await padamId(auth, tinggal.slice(i, i + 40));
   }
   tinggal = await masihAdaRph(supabase, bersih);
   if (!tinggal.length) return bersih.length;
@@ -418,27 +459,22 @@ export async function padamSemuaRph(kunci?: KunciSupabase) {
   const auth = kunciPadam(kunci);
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
 
-  const sebelum = await senaraiSemuaIdRph(auth);
-  if (!sebelum.length) return 0;
+  const sebelum = await bilanganRph(auth);
+  if (!sebelum) return 0;
 
-  for (let cubaan = 0; cubaan < 80; cubaan += 1) {
-    await padamSemuaBaris(auth);
-    let ids = await senaraiSemuaIdRph(auth);
-    if (!ids.length) return sebelum.length;
-    for (let i = 0; i < ids.length; i += 50) {
-      await padamId(auth, ids.slice(i, i + 50));
-    }
-    ids = await senaraiSemuaIdRph(auth);
-    if (!ids.length) return sebelum.length;
-  }
+  await padamSemuaBaris(auth);
+  if (!(await bilanganRph(auth))) return sebelum;
 
-  const tinggal = await senaraiSemuaIdRph(auth);
-  if (tinggal.length) {
+  const ids = await senaraiSemuaIdRph(auth);
+  if (ids.length) await padamRphPukal(ids, auth);
+
+  const baki = await bilanganRph(auth);
+  if (baki) {
     throw new Error(
-      `RPH tidak dapat dipadam daripada pangkalan data. ${tinggal.length} rekod termasuk id masih wujud dalam Supabase.`
+      `RPH tidak dapat dipadam daripada pangkalan data. ${baki} rekod termasuk id masih wujud dalam Supabase.`
     );
   }
-  return sebelum.length;
+  return sebelum;
 }
 
 export async function simpanRphPukal(senarai: Record<string, unknown>[]) {
