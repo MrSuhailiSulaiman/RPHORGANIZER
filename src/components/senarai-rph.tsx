@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
-import { isninPadaAtauSelepas, mingguDari, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { kumpulanMingguRph, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 
@@ -67,28 +67,7 @@ export function SenaraiRph() {
     [sesi]
   );
 
-  const kumpulanMinggu = useMemo(() => {
-    const adaTarikh = rph.filter((item) => item.tarikh);
-    if (!adaTarikh.length) return [];
-    const mula = isninPadaAtauSelepas(
-      [...adaTarikh].sort((a, b) => String(a.tarikh).localeCompare(String(b.tarikh)))[0].tarikh as string
-    );
-    const peta = new Map<number, RphRekod[]>();
-    for (const item of [...adaTarikh].sort((a, b) => String(a.tarikh).localeCompare(String(b.tarikh)))) {
-      const minggu = mingguDari(item.tarikh as string, mula);
-      const senarai = peta.get(minggu) ?? [];
-      senarai.push(item);
-      peta.set(minggu, senarai);
-    }
-    return [...peta.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([minggu, item]) => ({
-        minggu,
-        tarikh_mula: item[0]?.tarikh,
-        tarikh_tamat: item[item.length - 1]?.tarikh,
-        item,
-      }));
-  }, [rph]);
+  const kumpulanMinggu = useMemo(() => kumpulanMingguRph(rph), [rph]);
 
   async function padamRph(id: string) {
     if (padamId === id || sedangPukal) return;

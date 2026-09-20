@@ -168,3 +168,50 @@ export function susunSlotTahun(params: {
 
   return slots;
 }
+
+export type SlotMingguRph = {
+  id: string;
+  tarikh: string | null;
+  hari: string | null;
+  masa: string | null;
+};
+
+export function bandingSesiRph(a: SlotMingguRph, b: SlotMingguRph) {
+  const tarikh = String(a.tarikh ?? "").localeCompare(String(b.tarikh ?? ""));
+  if (tarikh) return tarikh;
+  const ha = HARI_LIST.indexOf((a.hari ?? "") as (typeof HARI_LIST)[number]);
+  const hb = HARI_LIST.indexOf((b.hari ?? "") as (typeof HARI_LIST)[number]);
+  if (ha !== hb) return (ha < 0 ? 99 : ha) - (hb < 0 ? 99 : hb);
+  return String(a.masa ?? "").localeCompare(String(b.masa ?? ""));
+}
+
+export function kumpulanMingguRph<T extends SlotMingguRph>(rekod: T[]) {
+  const adaTarikh = rekod.filter((item) => item.tarikh);
+  if (!adaTarikh.length) return [];
+  const mula = isninPadaAtauSelepas(
+    [...adaTarikh].sort((a, b) => String(a.tarikh).localeCompare(String(b.tarikh)))[0].tarikh as string
+  );
+  const peta = new Map<number, T[]>();
+  for (const item of [...adaTarikh].sort(bandingSesiRph)) {
+    const minggu = mingguDari(item.tarikh as string, mula);
+    const senarai = peta.get(minggu) ?? [];
+    senarai.push(item);
+    peta.set(minggu, senarai);
+  }
+  return [...peta.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([minggu, item]) => ({
+      minggu,
+      tarikh_mula: item[0]?.tarikh ?? undefined,
+      tarikh_tamat: item[item.length - 1]?.tarikh ?? undefined,
+      item,
+    }));
+}
+
+export function rphMingguSemasa<T extends SlotMingguRph>(rekod: T[], id: string) {
+  const kumpulan = kumpulanMingguRph(rekod);
+  const kumpul = kumpulan.find((item) => item.item.some((row) => row.id === id));
+  if (!kumpul) return null;
+  const indeks = kumpul.item.findIndex((row) => row.id === id);
+  return { ...kumpul, indeks };
+}

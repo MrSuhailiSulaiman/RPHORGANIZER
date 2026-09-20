@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { HARI_LIST, tarikhUntukHari } from "@/lib/jadual/parse";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "@/lib/rph/types";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
+import { rphMingguSemasa } from "@/lib/rph/tahun";
 import type { SesiPdp } from "@/lib/jadual/types";
 
 type Borang = {
@@ -109,20 +111,31 @@ export function BorangRph({
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangPadam, setSedangPadam] = useState(false);
   const [sedangJana, setSedangJana] = useState(false);
+  const [navMinggu, setNavMinggu] = useState<ReturnType<typeof rphMingguSemasa<RphRekod>>>(null);
   const janaMasa = useRef(0);
   const janaTunda = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let hidup = true;
     async function muat() {
+      setSedangMuat(true);
       try {
         if (rphId) {
-          const res = await fetch(`/api/rph/${rphId}`);
+          const [res, senaraiRes] = await Promise.all([
+            fetch(`/api/rph/${rphId}`, { cache: "no-store" }),
+            fetch(`/api/rph?t=${Date.now()}`, { cache: "no-store" }),
+          ]);
           const json = await res.json();
+          const senaraiJson = await senaraiRes.json();
           if (!res.ok) throw new Error(json.ralat ?? "RPH tidak dijumpai.");
-          if (hidup) setBorang(dariRekod(json.rph));
+          if (hidup) {
+            setBorang(dariRekod(json.rph));
+            setNavMinggu(rphMingguSemasa((senaraiJson.rph ?? []) as RphRekod[], rphId));
+            window.scrollTo(0, 0);
+          }
           return;
         }
+        if (hidup) setNavMinggu(null);
         if (sesiId) {
           const res = await fetch(`/api/sesi/${sesiId}`);
           const json = await res.json();
@@ -670,6 +683,70 @@ export function BorangRph({
           Simpan RPH
         </Button>
       </div>
+      {navMinggu && navMinggu.item.length ? (
+        <nav
+          className="flex flex-col gap-3 rounded-lg border bg-muted/30 px-3 py-3"
+          aria-label={`Navigasi RPH Minggu ${navMinggu.minggu}`}
+        >
+          <p className="text-center text-sm text-muted-foreground">
+            Minggu {navMinggu.minggu} · Sesi {navMinggu.indeks + 1} / {navMinggu.item.length}
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {navMinggu.indeks > 0 ? (
+              <Button asChild variant="outline">
+                <Link href={`/rph/${navMinggu.item[navMinggu.indeks - 1].id}`}>
+                  <ChevronLeft />
+                  Previous
+                </Link>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" disabled>
+                <ChevronLeft />
+                Previous
+              </Button>
+            )}
+            <div className="flex min-w-0 flex-1 flex-wrap justify-center gap-1">
+              {navMinggu.item.map((item, indeks) => {
+                const semasa = item.id === rphId;
+                const label = `RPH ${indeks + 1}${item.mata_pelajaran ? `: ${item.mata_pelajaran}` : ""}${item.tarikh ? ` ${item.tarikh}` : ""}`;
+                return semasa ? (
+                  <span
+                    key={item.id}
+                    aria-current="page"
+                    title={label}
+                    className="inline-flex size-8 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground"
+                  >
+                    {indeks + 1}
+                  </span>
+                ) : (
+                  <Link
+                    key={item.id}
+                    href={`/rph/${item.id}`}
+                    title={label}
+                    aria-label={label}
+                    className="inline-flex size-8 items-center justify-center rounded-md border border-border text-sm font-medium hover:bg-muted"
+                  >
+                    {indeks + 1}
+                  </Link>
+                );
+              })}
+            </div>
+            {navMinggu.indeks < navMinggu.item.length - 1 ? (
+              <Button asChild variant="outline">
+                <Link href={`/rph/${navMinggu.item[navMinggu.indeks + 1].id}`}>
+                  Next
+                  <ChevronRight />
+                </Link>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" disabled>
+                Next
+                <ChevronRight />
+              </Button>
+            )}
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }
