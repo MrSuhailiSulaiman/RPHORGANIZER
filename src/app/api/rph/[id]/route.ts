@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
 import { getRph, padamRph } from "@/lib/rph/save";
 
@@ -11,9 +12,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     const { id } = await params;
-    const rph = await getRph(id);
+    const rph = await getRph(id, auth.sesi.id);
     if (!rph) {
       return NextResponse.json(
         { ralat: "RPH tidak dijumpai." },
@@ -27,7 +30,7 @@ export async function GET(
   }
 }
 
-async function padamMengikutId(id: string) {
+async function padamMengikutId(id: string, penggunaId: string) {
   await connection();
   const cfg = await kunciServisSupabase();
   if (!cfg.url || !cfg.key) {
@@ -36,7 +39,7 @@ async function padamMengikutId(id: string) {
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }
-  await padamRph(id, cfg);
+  await padamRph(id, cfg, penggunaId);
   return NextResponse.json({ ok: true, bil: 1 }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -44,9 +47,11 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     const { id } = await params;
-    return await padamMengikutId(id);
+    return await padamMengikutId(id, auth.sesi.id);
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal memadam RPH.";
     return NextResponse.json({ ralat: mesej }, { status: 500, headers: { "Cache-Control": "no-store" } });
@@ -57,9 +62,11 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     const { id } = await params;
-    return await padamMengikutId(id);
+    return await padamMengikutId(id, auth.sesi.id);
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal memadam RPH.";
     return NextResponse.json({ ralat: mesej }, { status: 500, headers: { "Cache-Control": "no-store" } });

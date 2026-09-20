@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { janaBahanSesi, janaObjektifSesi } from "@/lib/rph/generate";
 import { geminiApiKey } from "@/lib/runtime-env";
@@ -9,6 +10,8 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 90;
 
 export async function POST(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     const kunci = await kunciGemini();
     geminiApiKey();

@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { janaBahanKurikulum } from "@/lib/rph/generate";
@@ -19,6 +20,8 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export async function GET() {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   const gemini = Boolean(await kunciGemini());
   return NextResponse.json(
     { gemini },
@@ -27,12 +30,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     await connection();
     await kunciGemini();
     const body = (await request.json().catch(() => ({}))) as { tarikh_mula?: string };
 
-    const sesi = await senaraiSesi();
+    const sesi = await senaraiSesi(auth.sesi.id);
     if (!sesi.length) {
       return NextResponse.json(
         { ralat: "Tiada sesi PdP. Tetapkan jadual waktu dahulu." },
@@ -112,11 +117,11 @@ export async function POST(request: Request) {
     const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_TAHUN, "JUMAAT");
     const cfg = supabaseRuntimeConfig();
     try {
-      await padamSemuaRph(cfg);
+      await padamSemuaRph(cfg, auth.sesi.id);
     } catch (error) {
       console.error("padam_sebelum_jana", error instanceof Error ? error.message : error);
     }
-    const bilangan = await simpanRphPukal(rekod);
+    const bilangan = await simpanRphPukal(rekod, auth.sesi.id);
 
     return NextResponse.json({
       tarikh_mula: tarikhMula,

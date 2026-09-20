@@ -515,3 +515,5 @@ $$;
 
 revoke all on function public.padam_rph_ids(uuid[]) from public;
 grant execute on function public.padam_rph_ids(uuid[]) to anon, authenticated, service_role;
+
+-- Akaun dan pemilikan RPH: jalankan juga supabase/pengguna.sql pada projek sedia ada.

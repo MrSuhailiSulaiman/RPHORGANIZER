@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
@@ -16,6 +17,8 @@ function json(data: unknown, status = 200) {
 }
 
 async function padam() {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   const cfg = await kunciServisSupabase();
   if (!cfg.url || !cfg.key) {
     return json(
@@ -23,8 +26,8 @@ async function padam() {
       500
     );
   }
-  const bilangan = await padamSemuaRph(cfg);
-  const baki = await bilanganSemuaRph(cfg);
+  const bilangan = await padamSemuaRph(cfg, auth.sesi.id);
+  const baki = await bilanganSemuaRph(cfg, auth.sesi.id);
   if (baki > 0) {
     return json(
       {
@@ -39,9 +42,11 @@ async function padam() {
 }
 
 export async function GET() {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   await connection();
   const cfg = await kunciServisSupabase();
-  const bil_rph = await bilanganSemuaRph(cfg);
+  const bil_rph = await bilanganSemuaRph(cfg, auth.sesi.id);
   return json({
     service_role: Boolean(cfg.url && cfg.key),
     bil_rph,

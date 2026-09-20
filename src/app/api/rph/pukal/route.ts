@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { simpanRphPukal } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
@@ -8,6 +9,8 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     await connection();
     const body = (await request.json().catch(() => ({}))) as { senarai?: unknown };
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const bil = await simpanRphPukal(muatan);
+    const bil = await simpanRphPukal(muatan, auth.sesi.id);
     return NextResponse.json(
       { ok: true, bil },
       { headers: { "Cache-Control": "no-store" } }

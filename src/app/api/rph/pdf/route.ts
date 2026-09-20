@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { binaPdfRphMinggu, namaFailPdfMinggu } from "@/lib/rph/pdf";
 import { getRphMengikutId } from "@/lib/rph/save";
 
@@ -16,6 +17,8 @@ function json(data: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     await connection();
     const body = (await request.json().catch(() => ({}))) as {
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
     if (!ids.length) {
       return json({ ralat: "Pilih sekurang-kurangnya satu sesi RPH untuk dimuat turun." }, 400);
     }
-    const rekod = await getRphMengikutId(ids);
+    const rekod = await getRphMengikutId(ids, auth.sesi.id);
     if (!rekod.length) {
       return json({ ralat: "Tiada rekod RPH untuk minggu ini." }, 404);
     }

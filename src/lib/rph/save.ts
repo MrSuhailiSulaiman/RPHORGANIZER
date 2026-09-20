@@ -66,14 +66,15 @@ const RPH_PADAM = "__DIPADAM__";
 const RUANGAN_SENARAI =
   "id,sesi_id,tarikh,hari,masa,tingkatan,kelas,mata_pelajaran,bidang_kod,bidang_nama,sk_kod,sk_tajuk,created_at,updated_at";
 
-export async function senaraiRph(): Promise<RphRekod[]> {
-  if (!isSupabaseConfigured()) return [];
+export async function senaraiRph(penggunaId: string): Promise<RphRekod[]> {
+  if (!isSupabaseConfigured() || !penggunaId) return [];
   const supabase = createAdminClient();
   const semua: RphRekod[] = [];
   for (let dari = 0; dari < 50000; dari += 1000) {
     const { data, error } = await supabase
       .from("rph")
       .select(RUANGAN_SENARAI)
+      .eq("pengguna_id", penggunaId)
       .order("tarikh", { ascending: false })
       .range(dari, dari + 999);
     if (error) {
@@ -89,10 +90,15 @@ export async function senaraiRph(): Promise<RphRekod[]> {
   return semua;
 }
 
-export async function getRph(id: string): Promise<RphRekod | null> {
-  if (!isSupabaseConfigured()) return null;
+export async function getRph(id: string, penggunaId: string): Promise<RphRekod | null> {
+  if (!isSupabaseConfigured() || !penggunaId) return null;
   const supabase = createAdminClient();
-  const { data, error } = await supabase.from("rph").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await supabase
+    .from("rph")
+    .select("*")
+    .eq("id", id)
+    .eq("pengguna_id", penggunaId)
+    .maybeSingle();
   if (error) {
     if (tableMissing(error)) return null;
     throw skemaRalat(error);
@@ -103,15 +109,19 @@ export async function getRph(id: string): Promise<RphRekod | null> {
   return rekod;
 }
 
-export async function getRphMengikutId(ids: string[]): Promise<RphRekod[]> {
-  if (!isSupabaseConfigured()) return [];
+export async function getRphMengikutId(ids: string[], penggunaId: string): Promise<RphRekod[]> {
+  if (!isSupabaseConfigured() || !penggunaId) return [];
   const bersih = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (!bersih.length) return [];
   const supabase = createAdminClient();
   const semua: RphRekod[] = [];
   for (let i = 0; i < bersih.length; i += 50) {
     const bahagian = bersih.slice(i, i + 50);
-    const { data, error } = await supabase.from("rph").select("*").in("id", bahagian);
+    const { data, error } = await supabase
+      .from("rph")
+      .select("*")
+      .eq("pengguna_id", penggunaId)
+      .in("id", bahagian);
     if (error) {
       if (tableMissing(error)) return [];
       throw skemaRalat(error);
@@ -126,10 +136,20 @@ export async function getRphMengikutId(ids: string[]): Promise<RphRekod[]> {
   return semua.sort((a, b) => (susunan.get(a.id) ?? 0) - (susunan.get(b.id) ?? 0));
 }
 
-export async function simpanRph(payload: Record<string, unknown>) {
+export async function simpanRph(payload: Record<string, unknown>, penggunaId: string) {
+  if (!penggunaId) throw new Error("Sila log masuk.");
   const supabase = createAdminClient();
-  const { data, error } = await supabase.rpc("simpan_rph", { payload });
+  const muatan = { ...payload, pengguna_id: penggunaId };
+  const idSedia = typeof payload.id === "string" ? payload.id : "";
+  if (idSedia) {
+    const sedia = await getRph(idSedia, penggunaId);
+    if (!sedia) throw new Error("RPH tidak dijumpai.");
+  }
+  const { data, error } = await supabase.rpc("simpan_rph", { payload: muatan });
   if (error) throw skemaRalat(error);
+  if (data) {
+    await supabase.from("rph").update({ pengguna_id: penggunaId }).eq("id", data);
+  }
   return { id: data as string };
 }
 
@@ -257,24 +277,19 @@ export async function getSemuaKurikulum(): Promise<KurikulumPilihan[]> {
   });
 }
 
-export async function padamRphDalamTempoh(mula: string, tamat: string) {
+export async function padamRphDalamTempoh(mula: string, tamat: string, penggunaId: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("rph")
     .delete()
+    .eq("pengguna_id", penggunaId)
     .gte("tarikh", mula)
     .lte("tarikh", tamat)
     .select("id");
   if (!error && (data?.length ?? 0) > 0) return data.length;
-
-  const { data: rpcBil, error: rpcRalat } = await supabase.rpc("padam_rph_tahun", {
-    tarikh_mula: mula,
-    tarikh_tamat: tamat,
-  });
-  if (!rpcRalat) return Number(rpcBil ?? 0);
   if (!error) return data?.length ?? 0;
-  if (tableMissing(error) || tableMissing(rpcRalat)) return 0;
-  throw skemaRalat(rpcRalat);
+  if (tableMissing(error)) return 0;
+  throw skemaRalat(error);
 }
 
 function bilPadam(res: Response) {
@@ -341,12 +356,15 @@ async function sorokRph(supabase: SupabaseClient, ids: string[]) {
   }
 }
 
-async function senaraiSemuaIdRph(kunci: KunciSupabase) {
+async function senaraiSemuaIdRph(kunci: KunciSupabase, penggunaId?: string) {
   if (!kunci.url || !kunci.key) return [];
+  const tapis = penggunaId
+    ? `&pengguna_id=eq.${encodeURIComponent(penggunaId)}`
+    : "";
   const ids: string[] = [];
   for (let dari = 0; dari < 50000; dari += 1000) {
     const res = await fetchPadam(
-      `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}&limit=1000&offset=${dari}`,
+      `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}${tapis}&limit=1000&offset=${dari}`,
       { headers: { apikey: kunci.key, Authorization: `Bearer ${kunci.key}` } },
       15000
     );
@@ -360,9 +378,10 @@ async function senaraiSemuaIdRph(kunci: KunciSupabase) {
   return ids;
 }
 
-async function bilanganRph(kunci: KunciSupabase) {
+async function bilanganRph(kunci: KunciSupabase, penggunaId?: string) {
+  const tapis = penggunaId ? `&pengguna_id=eq.${encodeURIComponent(penggunaId)}` : "";
   const res = await fetchPadam(
-    `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}`,
+    `${kunci.url}/rest/v1/rph?select=id&mata_pelajaran=not.eq.${encodeURIComponent(RPH_PADAM)}${tapis}`,
     {
       method: "HEAD",
       headers: {
@@ -377,28 +396,28 @@ async function bilanganRph(kunci: KunciSupabase) {
   const julat = res?.headers.get("content-range") ?? "";
   const padanan = /\/(\d+)\s*$/.exec(julat);
   if (padanan) return Number(padanan[1]);
-  return (await senaraiSemuaIdRph(kunci)).length;
+  return (await senaraiSemuaIdRph(kunci, penggunaId)).length;
 }
 
-export async function bilanganSemuaRph(kunci?: KunciSupabase) {
-  return bilanganRph(kunciPadam(kunci));
+export async function bilanganSemuaRph(kunci?: KunciSupabase, penggunaId?: string) {
+  return bilanganRph(kunciPadam(kunci), penggunaId);
 }
 
-async function padamSemuaBaris(kunci: KunciSupabase) {
+async function padamSemuaBaris(kunci: KunciSupabase, penggunaId: string) {
   const kepala = kepalaPadam(kunci.key);
   const rpc = await fetchPadam(
-    `${kunci.url}/rest/v1/rpc/padam_semua_rph`,
+    `${kunci.url}/rest/v1/rpc/padam_rph_pengguna`,
     {
       method: "POST",
       headers: { ...kepala, "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ p_pengguna_id: penggunaId }),
     },
     15000
   );
   if (rpc?.ok) return Number((await rpc.text()).replace(/[^\d-]/g, "") || "0");
 
   const res = await fetchPadam(
-    `${kunci.url}/rest/v1/rph?id=not.is.null`,
+    `${kunci.url}/rest/v1/rph?pengguna_id=eq.${encodeURIComponent(penggunaId)}`,
     { method: "DELETE", headers: kepala },
     15000
   );
@@ -418,57 +437,65 @@ async function padamId(kunci: KunciSupabase, ids: string[]) {
   return bilPadam(res);
 }
 
-export async function padamRph(id: string, kunci?: KunciSupabase) {
-  await padamRphPukal([id], kunci);
+export async function padamRph(id: string, kunci?: KunciSupabase, penggunaId?: string) {
+  await padamRphPukal([id], kunci, penggunaId);
 }
 
-export async function padamRphPukal(ids: string[], kunci?: KunciSupabase) {
+export async function padamRphPukal(ids: string[], kunci?: KunciSupabase, penggunaId?: string) {
   const auth = kunciPadam(kunci);
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
   const bersih = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (!bersih.length) return 0;
   const supabase = klienPadam(auth);
+  const milik = penggunaId
+    ? (await getRphMengikutId(bersih, penggunaId)).map((item) => item.id)
+    : bersih;
+  if (!milik.length) return 0;
 
-  for (let i = 0; i < bersih.length; i += 80) {
-    await supabase.rpc("padam_rph_ids", { ids: bersih.slice(i, i + 80) });
+  for (let i = 0; i < milik.length; i += 80) {
+    await supabase.rpc("padam_rph_ids", { ids: milik.slice(i, i + 80) });
   }
-  let tinggal = await masihAdaRph(supabase, bersih);
-  if (!tinggal.length) return bersih.length;
+  let tinggal = await masihAdaRph(supabase, milik);
+  if (penggunaId) tinggal = tinggal.filter((id) => milik.includes(id));
+  if (!tinggal.length) return milik.length;
 
   for (let i = 0; i < tinggal.length; i += 40) {
-    await supabase.from("rph").delete().in("id", tinggal.slice(i, i + 40));
+    let q = supabase.from("rph").delete().in("id", tinggal.slice(i, i + 40));
+    if (penggunaId) q = q.eq("pengguna_id", penggunaId);
+    await q;
   }
-  tinggal = await masihAdaRph(supabase, bersih);
-  if (!tinggal.length) return bersih.length;
+  tinggal = await masihAdaRph(supabase, milik);
+  if (!tinggal.length) return milik.length;
 
   for (let i = 0; i < tinggal.length; i += 40) {
     await padamId(auth, tinggal.slice(i, i + 40));
   }
-  tinggal = await masihAdaRph(supabase, bersih);
-  if (!tinggal.length) return bersih.length;
+  tinggal = await masihAdaRph(supabase, milik);
+  if (!tinggal.length) return milik.length;
 
   await sorokRph(supabase, tinggal);
-  tinggal = await masihAdaRph(supabase, bersih);
+  tinggal = await masihAdaRph(supabase, milik);
   if (tinggal.length) {
     throw new Error("Rekod RPH tidak dapat dipadam daripada pangkalan data.");
   }
-  return bersih.length;
+  return milik.length;
 }
 
-export async function padamSemuaRph(kunci?: KunciSupabase) {
+export async function padamSemuaRph(kunci?: KunciSupabase, penggunaId?: string) {
   const auth = kunciPadam(kunci);
   if (!auth.url || !auth.key) throw new Error("Supabase belum dikonfigurasi.");
+  if (!penggunaId) throw new Error("Sila log masuk.");
 
-  const sebelum = await bilanganRph(auth);
+  const sebelum = await bilanganRph(auth, penggunaId);
   if (!sebelum) return 0;
 
-  await padamSemuaBaris(auth);
-  if (!(await bilanganRph(auth))) return sebelum;
+  await padamSemuaBaris(auth, penggunaId);
+  if (!(await bilanganRph(auth, penggunaId))) return sebelum;
 
-  const ids = await senaraiSemuaIdRph(auth);
-  if (ids.length) await padamRphPukal(ids, auth);
+  const ids = await senaraiSemuaIdRph(auth, penggunaId);
+  if (ids.length) await padamRphPukal(ids, auth, penggunaId);
 
-  const baki = await bilanganRph(auth);
+  const baki = await bilanganRph(auth, penggunaId);
   if (baki) {
     throw new Error(
       `RPH tidak dapat dipadam daripada pangkalan data. ${baki} rekod termasuk id masih wujud dalam Supabase.`
@@ -477,17 +504,22 @@ export async function padamSemuaRph(kunci?: KunciSupabase) {
   return sebelum;
 }
 
-export async function simpanRphPukal(senarai: Record<string, unknown>[]) {
+export async function simpanRphPukal(senarai: Record<string, unknown>[], penggunaId: string) {
   if (!senarai.length) return 0;
+  if (!penggunaId) throw new Error("Sila log masuk.");
   const supabase = createAdminClient();
-  const { error } = await supabase.rpc("simpan_rph_pukal", { senarai });
-  if (!error) return senarai.length;
+  const muatan = senarai.map((item) => ({ ...item, pengguna_id: penggunaId }));
+  const { error } = await supabase.rpc("simpan_rph_pukal", { senarai: muatan });
+  if (!error) {
+    await supabase.from("rph").update({ pengguna_id: penggunaId }).is("pengguna_id", null);
+    return senarai.length;
+  }
 
   const saiz = 8;
   let bil = 0;
-  for (let i = 0; i < senarai.length; i += saiz) {
-    const bahagian = senarai.slice(i, i + saiz);
-    const hasil = await Promise.allSettled(bahagian.map((item) => simpanRph(item)));
+  for (let i = 0; i < muatan.length; i += saiz) {
+    const bahagian = muatan.slice(i, i + saiz);
+    const hasil = await Promise.allSettled(bahagian.map((item) => simpanRph(item, penggunaId)));
     for (const item of hasil) {
       if (item.status === "fulfilled") bil += 1;
       else if (i === 0 && item.status === "rejected") {

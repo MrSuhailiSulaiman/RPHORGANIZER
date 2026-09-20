@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
 import { padamRph, padamRphPukal } from "@/lib/rph/save";
 
@@ -16,6 +17,8 @@ function json(data: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
   try {
     await connection();
     const body = (await request.json().catch(() => ({}))) as { ids?: unknown; id?: unknown };
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
       return json({ ralat: "Padam RPH memerlukan kunci servis Supabase." }, 500);
     }
     const unik = [...new Set(ids)];
-    const bil = unik.length === 1 ? (await padamRph(unik[0], cfg), 1) : await padamRphPukal(unik, cfg);
+    const bil = unik.length === 1 ? (await padamRph(unik[0], cfg, auth.sesi.id), 1) : await padamRphPukal(unik, cfg, auth.sesi.id);
     return json({ ok: true, bil });
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal memadam RPH.";

@@ -15,12 +15,13 @@ function skemaRalat(error: { message?: string }) {
   return new Error(error.message ?? "Ralat pangkalan data.");
 }
 
-export async function senaraiSesi(): Promise<SesiPdp[]> {
-  if (!isSupabaseConfigured()) return [];
+export async function senaraiSesi(penggunaId: string): Promise<SesiPdp[]> {
+  if (!isSupabaseConfigured() || !penggunaId) return [];
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("sesi_pdp")
     .select("id, kelas, tingkatan, hari, masa, masa_mula, masa_tamat, mata_pelajaran, susunan")
+    .eq("pengguna_id", penggunaId)
     .order("susunan", { ascending: true });
   if (error) {
     if (tableMissing(error)) return [];
@@ -40,13 +41,14 @@ export async function senaraiSesi(): Promise<SesiPdp[]> {
   );
 }
 
-export async function getSesi(id: string): Promise<SesiPdp | null> {
-  if (!isSupabaseConfigured()) return null;
+export async function getSesi(id: string, penggunaId: string): Promise<SesiPdp | null> {
+  if (!isSupabaseConfigured() || !penggunaId) return null;
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("sesi_pdp")
     .select("id, kelas, tingkatan, hari, masa, masa_mula, masa_tamat, mata_pelajaran")
     .eq("id", id)
+    .eq("pengguna_id", penggunaId)
     .maybeSingle();
   if (error) {
     if (tableMissing(error)) return null;
@@ -65,12 +67,13 @@ export async function getSesi(id: string): Promise<SesiPdp | null> {
   };
 }
 
-export async function getJadualTerkini(): Promise<JadualWaktu | null> {
-  if (!isSupabaseConfigured()) return null;
+export async function getJadualTerkini(penggunaId: string): Promise<JadualWaktu | null> {
+  if (!isSupabaseConfigured() || !penggunaId) return null;
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("jadual_waktu")
     .select("id, nama_fail, created_at")
+    .eq("pengguna_id", penggunaId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -83,27 +86,30 @@ export async function getJadualTerkini(): Promise<JadualWaktu | null> {
     id: data.id,
     nama_fail: data.nama_fail,
     created_at: data.created_at,
-    sesi: await senaraiSesi(),
+    sesi: await senaraiSesi(penggunaId),
   };
 }
 
-export async function simpanJadual(namaFail: string, sesi: SesiPdp[]) {
+export async function simpanJadual(namaFail: string, sesi: SesiPdp[], penggunaId: string) {
+  if (!penggunaId) throw new Error("Sila log masuk.");
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("simpan_jadual_waktu", {
     payload: {
       nama_fail: namaFail,
+      pengguna_id: penggunaId,
       sesi,
     },
   });
   if (!error) return { id: data as string };
 
-  if (!/DELETE requires a WHERE clause/i.test(error.message ?? "")) {
+  if (!/DELETE requires a WHERE clause|pengguna_id diperlukan|column .*pengguna_id/i.test(error.message ?? "")) {
     throw skemaRalat(error);
   }
 
   const { data: sediaAda, error: bacaRalat } = await supabase
     .from("jadual_waktu")
     .select("id")
+    .eq("pengguna_id", penggunaId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -115,13 +121,13 @@ export async function simpanJadual(namaFail: string, sesi: SesiPdp[]) {
     if (padamSesi) throw skemaRalat(padamSesi);
     const { error: kemaskini } = await supabase
       .from("jadual_waktu")
-      .update({ nama_fail: namaFail })
+      .update({ nama_fail: namaFail, pengguna_id: penggunaId })
       .eq("id", jadualId);
     if (kemaskini) throw skemaRalat(kemaskini);
   } else {
     const { data: baru, error: cipta } = await supabase
       .from("jadual_waktu")
-      .insert({ nama_fail: namaFail })
+      .insert({ nama_fail: namaFail, pengguna_id: penggunaId })
       .select("id")
       .single();
     if (cipta) throw skemaRalat(cipta);
@@ -139,6 +145,7 @@ export async function simpanJadual(namaFail: string, sesi: SesiPdp[]) {
       masa_tamat: item.masa_tamat || null,
       mata_pelajaran: item.mata_pelajaran,
       susunan: index,
+      pengguna_id: penggunaId,
     }))
   );
   if (masukSesi) {

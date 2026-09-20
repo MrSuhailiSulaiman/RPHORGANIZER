@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
 import { bilanganSemuaRph, padamSemuaRph } from "@/lib/rph/save";
 
@@ -14,6 +15,8 @@ function keRph(request: Request, query: string) {
 
 async function padamDanPergi(request: Request) {
   try {
+    const auth = await wajibSesi();
+    if (!auth.sesi) return NextResponse.redirect(new URL("/masuk", request.url), 303);
     const cfg = await kunciServisSupabase();
     if (!cfg.url || !cfg.key) {
       return keRph(
@@ -21,8 +24,8 @@ async function padamDanPergi(request: Request) {
         `padam=kunci&m=${encodeURIComponent("Padam RPH memerlukan kunci servis Supabase.")}`
       );
     }
-    await padamSemuaRph(cfg);
-    const baki = await bilanganSemuaRph(cfg);
+    await padamSemuaRph(cfg, auth.sesi.id);
+    const baki = await bilanganSemuaRph(cfg, auth.sesi.id);
     revalidatePath("/rph");
     revalidatePath("/api/rph");
     if (baki > 0) return keRph(request, `padam=baki&n=${baki}`);
