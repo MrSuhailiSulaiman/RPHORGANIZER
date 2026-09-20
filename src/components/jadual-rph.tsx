@@ -82,7 +82,6 @@ export function JadualRph({
   onTogolSp?: (sp: RphStandard, checked: boolean) => void;
 }) {
   const [kurikulum, setKurikulum] = useState<KurikulumPilihan | null>(null);
-  const namaRefleksi = `refleksi-${borang.id ?? "baru"}`;
   const borangRujukan = useRef(borang);
   const onChangeRujukan = useRef(onChange);
   borangRujukan.current = borang;
@@ -197,6 +196,9 @@ export function JadualRph({
       refleksi_berjaya: borang.refleksi_berjaya === nilai ? "" : nilai,
     });
   }
+
+  const rupaRadio =
+    "size-4 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]";
 
   return (
     <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
@@ -467,16 +469,13 @@ export function JadualRph({
               </div>
             </td>
             <td className={cell} colSpan={4}>
-              <label className="flex items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
-                  type="radio"
-                  name={namaRefleksi}
+                  type="checkbox"
+                  className={rupaRadio}
                   checked={borang.refleksi_berjaya === "ya"}
-                  onChange={() => undefined}
-                  onClick={(event) => {
-                    if (borang.refleksi_berjaya === "ya") event.preventDefault();
-                    pilihRefleksi("ya");
-                  }}
+                  onChange={() => pilihRefleksi("ya")}
+                  aria-label="Murid berjaya menguasai objektif pembelajaran dengan baik"
                 />
                 <span>
                   Murid <strong className="text-green-700">berjaya</strong> menguasai objektif pembelajaran
@@ -488,16 +487,13 @@ export function JadualRph({
           <tr>
             <td className={cell} colSpan={1} />
             <td className={cell} colSpan={4}>
-              <label className="flex items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
-                  type="radio"
-                  name={namaRefleksi}
+                  type="checkbox"
+                  className={rupaRadio}
                   checked={borang.refleksi_berjaya === "tidak"}
-                  onChange={() => undefined}
-                  onClick={(event) => {
-                    if (borang.refleksi_berjaya === "tidak") event.preventDefault();
-                    pilihRefleksi("tidak");
-                  }}
+                  onChange={() => pilihRefleksi("tidak")}
+                  aria-label="Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
                 />
                 <span>
                   Murid <strong className="text-red-700">tidak berjaya</strong> menguasai objektif
