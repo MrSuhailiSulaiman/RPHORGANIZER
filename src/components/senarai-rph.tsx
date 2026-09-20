@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Download, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ClipboardList, Download, LayoutList, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -281,6 +281,12 @@ export function SenaraiRph() {
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/rph/minggu?minggu=${kumpul.minggu}&ids=${idMinggu.join(",")}`}>
+                        <LayoutList />
+                        Papar semua
+                      </Link>
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"

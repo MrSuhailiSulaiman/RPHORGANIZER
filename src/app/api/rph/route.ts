@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { kunciServisSupabase } from "@/lib/rph/kunci-padam";
-import { getKurikulum, padamRphPukal, senaraiRph, simpanRph } from "@/lib/rph/save";
+import { getKurikulum, getRphMengikutId, padamRphPukal, senaraiRph, simpanRph } from "@/lib/rph/save";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -13,8 +13,20 @@ export async function GET(request: Request) {
   await connection();
   const url = new URL(request.url);
   const kurikulum = url.searchParams.get("kurikulum");
+  const idsParam = url.searchParams.get("ids") ?? "";
   const mata = url.searchParams.get("mata_pelajaran") ?? "";
   const tingkatan = url.searchParams.get("tingkatan") ?? "";
+
+  if (idsParam) {
+    try {
+      const ids = idsParam.split(/[,\s]+/).map((id) => id.trim()).filter(Boolean);
+      const rph = await getRphMengikutId(ids);
+      return NextResponse.json({ rph }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      const mesej = error instanceof Error ? error.message : "Gagal memuatkan RPH.";
+      return NextResponse.json({ ralat: mesej }, { status: 500 });
+    }
+  }
 
   if (kurikulum === "1") {
     try {

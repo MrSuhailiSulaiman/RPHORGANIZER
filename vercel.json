@@ -19,6 +19,9 @@
     },
     "src/app/api/rph/pdf/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/rph/pukal/route.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [
