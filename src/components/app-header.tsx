@@ -27,8 +27,11 @@ export function AppHeader({
 
   return (
     <header className="border-b bg-card/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
-        <Link href={halamanAuth ? "/masuk" : "/"} className="flex items-center gap-2 font-heading text-sm font-semibold tracking-tight">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5">
+        <Link
+          href={halamanAuth ? "/masuk" : "/"}
+          className="flex shrink-0 items-center gap-2 font-heading text-sm font-semibold tracking-tight"
+        >
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <BookMarked className="size-4" />
           </span>
@@ -38,8 +41,8 @@ export function AppHeader({
           </span>
         </Link>
         {halamanAuth ? null : (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <nav className="flex flex-wrap items-center justify-end gap-1">
+          <>
+            <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
               {nav.map((item) => {
                 const active =
                   pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
@@ -60,11 +63,16 @@ export function AppHeader({
               })}
             </nav>
             {pengguna ? (
-              <div className="flex items-center gap-2 border-l pl-2">
-                <span className="text-sm">{pengguna.nama}</span>
-                <Badge variant={pengguna.peranan === "admin" ? "default" : "secondary"}>
-                  {pengguna.peranan === "admin" ? "Admin" : "Pengguna"}
-                </Badge>
+              <div className="flex shrink-0 items-center gap-3 border-l border-border pl-4">
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-sm font-medium leading-none">{pengguna.nama}</span>
+                  <Badge
+                    variant={pengguna.peranan === "admin" ? "default" : "secondary"}
+                    className="h-4 px-1.5 text-[10px]"
+                  >
+                    {pengguna.peranan === "admin" ? "Admin" : "Pengguna"}
+                  </Badge>
+                </div>
                 <form action="/api/auth/keluar" method="post">
                   <Button type="submit" variant="ghost" size="sm">
                     <LogOut />
@@ -73,7 +81,7 @@ export function AppHeader({
                 </form>
               </div>
             ) : null}
-          </div>
+          </>
         )}
       </div>
     </header>
