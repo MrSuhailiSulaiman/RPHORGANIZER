@@ -64,12 +64,9 @@ export function AppHeader({
             </nav>
             {pengguna ? (
               <div className="flex shrink-0 items-center gap-3 border-l border-border pl-4">
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-sm font-medium leading-none">{pengguna.nama}</span>
-                  <Badge
-                    variant={pengguna.peranan === "admin" ? "default" : "secondary"}
-                    className="h-4 px-1.5 text-[10px]"
-                  >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium uppercase">{pengguna.nama}</span>
+                  <Badge variant={pengguna.peranan === "admin" ? "default" : "secondary"}>
                     {pengguna.peranan === "admin" ? "Admin" : "Pengguna"}
                   </Badge>
                 </div>
