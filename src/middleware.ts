@@ -6,11 +6,19 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const awam =
     path === "/masuk" ||
-    path === "/daftar" ||
-    path.startsWith("/api/auth/") ||
+    path === "/api/auth/masuk" ||
+    path === "/api/auth/keluar" ||
+    path === "/api/auth/saya" ||
     path.startsWith("/_next") ||
     path === "/favicon.ico";
   const sesi = await bacaMuatanSesi(request.cookies.get(NAMA_KUKI_SESI)?.value);
+
+  if (path === "/daftar") {
+    const url = request.nextUrl.clone();
+    url.search = "";
+    url.pathname = sesi?.peranan === "admin" ? "/pengguna" : sesi ? "/" : "/masuk";
+    return NextResponse.redirect(url);
+  }
 
   if (!sesi && !awam) {
     if (path.startsWith("/api/")) {
@@ -22,7 +30,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (sesi && (path === "/masuk" || path === "/daftar")) {
+  if (sesi && path === "/masuk") {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

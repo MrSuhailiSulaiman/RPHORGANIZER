@@ -6,7 +6,7 @@ export async function sesiSemasa() {
   try {
     await pastikanAdmin();
   } catch {
-    // Skema mungkin belum dipasang; halaman login akan tunjuk ralat semasa daftar/masuk.
+    // Skema mungkin belum dipasang; halaman login akan tunjuk ralat semasa log masuk.
   }
   return sesiDariKuki();
 }

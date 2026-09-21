@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,14 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function BorangDaftar() {
-  const router = useRouter();
+export function BorangDaftar({ onSelesai }: { onSelesai?: () => void }) {
   const [sedang, setSedang] = useState(false);
 
   async function hantar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sedang) return;
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const kata = String(data.get("kata_laluan") ?? "");
     const sahkan = String(data.get("sahkan") ?? "");
     if (kata !== sahkan) {
@@ -34,46 +32,64 @@ export function BorangDaftar() {
           kata_laluan: kata,
         }),
       });
-      const json = (await res.json().catch(() => ({}))) as { ralat?: string };
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string; pengguna?: { nama?: string } };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal mendaftar.");
-      router.replace("/");
-      router.refresh();
+      form.reset();
+      toast.success(
+        json.pengguna?.nama
+          ? `Pengguna biasa ${json.pengguna.nama} didaftarkan.`
+          : "Pengguna biasa didaftarkan."
+      );
+      onSelesai?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal mendaftar.");
+    } finally {
       setSedang(false);
     }
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md">
+    <Card>
       <CardHeader>
-        <CardTitle>Daftar akaun</CardTitle>
-        <CardDescription>Akaun baharu ialah pengguna biasa. Setiap guru hanya nampak RPH sendiri.</CardDescription>
+        <CardTitle>Daftar pengguna biasa</CardTitle>
+        <CardDescription>
+          Hanya admin boleh daftar akaun. Guru kemudian log masuk dengan nama dan kata laluan ini.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form className="space-y-4" onSubmit={(event) => void hantar(event)}>
-          <div className="space-y-1.5">
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void hantar(event)}>
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="nama_pengguna">Nama pengguna</Label>
-            <Input id="nama_pengguna" name="nama_pengguna" autoComplete="username" required />
+            <Input id="nama_pengguna" name="nama_pengguna" autoComplete="off" required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="kata_laluan">Kata laluan</Label>
-            <Input id="kata_laluan" name="kata_laluan" type="password" autoComplete="new-password" required minLength={6} />
+            <Input
+              id="kata_laluan"
+              name="kata_laluan"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="sahkan">Sahkan kata laluan</Label>
-            <Input id="sahkan" name="sahkan" type="password" autoComplete="new-password" required minLength={6} />
+            <Input
+              id="sahkan"
+              name="sahkan"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+            />
           </div>
-          <Button type="submit" className="w-full" disabled={sedang}>
-            {sedang ? <Loader2 className="animate-spin" /> : <UserPlus />}
-            {sedang ? "Mendaftar..." : "Daftar"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Sudah ada akaun?{" "}
-            <Link href="/masuk" className="underline">
-              Log masuk
-            </Link>
-          </p>
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={sedang}>
+              {sedang ? <Loader2 className="animate-spin" /> : <UserPlus />}
+              {sedang ? "Mendaftar..." : "Daftar pengguna"}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

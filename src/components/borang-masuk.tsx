@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
@@ -44,7 +43,7 @@ export function BorangMasuk() {
     <Card className="mx-auto w-full max-w-md">
       <CardHeader>
         <CardTitle>Log masuk e-RPH</CardTitle>
-        <CardDescription>Daftar akaun baharu atau log masuk untuk menggunakan sistem.</CardDescription>
+        <CardDescription>Log masuk dengan akaun yang diberikan oleh admin.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={(event) => void hantar(event)}>
@@ -60,12 +59,6 @@ export function BorangMasuk() {
             {sedang ? <Loader2 className="animate-spin" /> : <LogIn />}
             {sedang ? "Log masuk..." : "Log masuk"}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Belum ada akaun?{" "}
-            <Link href="/daftar" className="underline">
-              Daftar
-            </Link>
-          </p>
         </form>
       </CardContent>
     </Card>

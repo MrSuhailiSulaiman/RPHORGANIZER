@@ -21,7 +21,7 @@ export function AppHeader({
   pengguna?: { nama: string; peranan: string } | null;
 }) {
   const pathname = usePathname();
-  const halamanAuth = pathname === "/masuk" || pathname === "/daftar";
+  const halamanAuth = pathname === "/masuk";
   const nav =
     pengguna?.peranan === "admin" ? [...NAV, { href: "/pengguna", label: "Senarai pengguna" }] : NAV;
 
