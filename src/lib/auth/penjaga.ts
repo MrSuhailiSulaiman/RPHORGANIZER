@@ -23,3 +23,20 @@ export async function wajibSesi(): Promise<
   }
   return { sesi, ralat: null };
 }
+
+export async function wajibAdmin(): Promise<
+  { sesi: SesiPengguna; ralat: null } | { sesi: null; ralat: NextResponse }
+> {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth;
+  if (auth.sesi.peranan !== "admin") {
+    return {
+      sesi: null,
+      ralat: NextResponse.json(
+        { ralat: "Halaman ini untuk admin sahaja." },
+        { status: 403, headers: { "Cache-Control": "no-store" } }
+      ),
+    };
+  }
+  return auth;
+}

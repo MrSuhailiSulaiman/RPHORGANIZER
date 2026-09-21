@@ -6,6 +6,12 @@ export type RekodPengguna = {
   id: string;
   nama_pengguna: string;
   peranan: PerananPengguna;
+  created_at?: string;
+};
+
+export type RekodPenggunaSenarai = RekodPengguna & {
+  created_at: string;
+  bil_rph: number;
 };
 
 const ADMIN_NAMA = "admin";
@@ -21,11 +27,17 @@ function ralatSkema(error: { message?: string } | null) {
   return new Error(mesej || "Ralat pangkalan data.");
 }
 
-function petaPengguna(row: { id: string; nama_pengguna: string; peranan?: string }): RekodPengguna {
+function petaPengguna(row: {
+  id: string;
+  nama_pengguna: string;
+  peranan?: string;
+  created_at?: string | null;
+}): RekodPengguna {
   return {
     id: row.id,
     nama_pengguna: row.nama_pengguna,
     peranan: row.peranan === "admin" ? "admin" : "pengguna",
+    created_at: row.created_at ? String(row.created_at) : undefined,
   };
 }
 
@@ -107,4 +119,48 @@ export async function logMasukPengguna(nama: string, kataLaluan: string): Promis
     throw new Error("Nama pengguna atau kata laluan tidak sah.");
   }
   return petaPengguna(data);
+}
+
+export async function getPengguna(id: string): Promise<RekodPengguna | null> {
+  await pastikanAdmin();
+  if (!isSupabaseConfigured() || !id) return null;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("pengguna")
+    .select("id,nama_pengguna,peranan,created_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw ralatSkema(error);
+  if (!data) return null;
+  return petaPengguna(data);
+}
+
+export async function senaraiPengguna(): Promise<RekodPenggunaSenarai[]> {
+  await pastikanAdmin();
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("pengguna")
+    .select("id,nama_pengguna,peranan,created_at")
+    .order("nama_pengguna");
+  if (error) throw ralatSkema(error);
+
+  const senarai = data ?? [];
+  const kiraan = await Promise.all(
+    senarai.map(async (row) => {
+      const { count } = await supabase
+        .from("rph")
+        .select("id", { count: "exact", head: true })
+        .eq("pengguna_id", row.id)
+        .neq("mata_pelajaran", "__DIPADAM__");
+      return [row.id as string, count ?? 0] as const;
+    })
+  );
+  const peta = new Map(kiraan);
+
+  return senarai.map((row) => ({
+    ...petaPengguna(row),
+    created_at: row.created_at ? String(row.created_at) : "",
+    bil_rph: peta.get(row.id) ?? 0,
+  }));
 }

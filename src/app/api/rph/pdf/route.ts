@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
+import { getPengguna } from "@/lib/auth/pengguna";
 import { binaPdfRphMinggu, namaFailPdfMinggu } from "@/lib/rph/pdf";
 import { getRphMengikutId } from "@/lib/rph/save";
 
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
       minggu?: unknown;
       tarikh_mula?: unknown;
       tarikh_tamat?: unknown;
+      pengguna_id?: unknown;
     };
     const ids = (Array.isArray(body.ids) ? body.ids : [])
       .map((id) => String(id).trim())
@@ -33,14 +35,26 @@ export async function POST(request: Request) {
     if (!ids.length) {
       return json({ ralat: "Pilih sekurang-kurangnya satu sesi RPH untuk dimuat turun." }, 400);
     }
-    const rekod = await getRphMengikutId(ids, auth.sesi.id);
+    let pemilikId = auth.sesi.id;
+    let namaPengguna = auth.sesi.nama;
+    const sasaranId = typeof body.pengguna_id === "string" ? body.pengguna_id.trim() : "";
+    if (sasaranId && sasaranId !== auth.sesi.id) {
+      if (auth.sesi.peranan !== "admin") {
+        return json({ ralat: "Halaman ini untuk admin sahaja." }, 403);
+      }
+      const sasaran = await getPengguna(sasaranId);
+      if (!sasaran) return json({ ralat: "Pengguna tidak dijumpai." }, 404);
+      pemilikId = sasaran.id;
+      namaPengguna = sasaran.nama_pengguna;
+    }
+    const rekod = await getRphMengikutId(ids, pemilikId);
     if (!rekod.length) {
       return json({ ralat: "Tiada rekod RPH untuk minggu ini." }, 404);
     }
     const minggu = Number(body.minggu);
     const nomborMinggu = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
     const pdf = await binaPdfRphMinggu({ rekod, minggu: nomborMinggu });
-    const nama = namaFailPdfMinggu(nomborMinggu, auth.sesi.nama);
+    const nama = namaFailPdfMinggu(nomborMinggu, namaPengguna);
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {

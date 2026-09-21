@@ -22,6 +22,8 @@ export function AppHeader({
 }) {
   const pathname = usePathname();
   const halamanAuth = pathname === "/masuk" || pathname === "/daftar";
+  const nav =
+    pengguna?.peranan === "admin" ? [...NAV, { href: "/pengguna", label: "Senarai pengguna" }] : NAV;
 
   return (
     <header className="border-b bg-card/80 backdrop-blur">
@@ -38,7 +40,7 @@ export function AppHeader({
         {halamanAuth ? null : (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <nav className="flex flex-wrap items-center justify-end gap-1">
-              {NAV.map((item) => {
+              {nav.map((item) => {
                 const active =
                   pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
                 return (

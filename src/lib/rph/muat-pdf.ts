@@ -3,6 +3,7 @@ export async function muatTurunPdfMinggu(params: {
   minggu: number;
   tarikh_mula?: string | null;
   tarikh_tamat?: string | null;
+  penggunaId?: string;
 }) {
   const res = await fetch("/api/rph/pdf", {
     method: "POST",
@@ -17,6 +18,7 @@ export async function muatTurunPdfMinggu(params: {
       minggu: params.minggu,
       tarikh_mula: params.tarikh_mula ?? undefined,
       tarikh_tamat: params.tarikh_tamat ?? undefined,
+      pengguna_id: params.penggunaId,
     }),
   });
   const jenis = res.headers.get("content-type") ?? "";
