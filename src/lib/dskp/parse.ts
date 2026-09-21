@@ -4,9 +4,6 @@ const HEADER_PATTERNS = [
   /KSSM[^\n]*TINGKATAN\s+\d+/gi,
   /STANDARD\s+KANDUNGAN/gi,
   /STANDARD\s+PEMBELAJARAN/gi,
-  /STANDARD\s+PRESTASI/gi,
-  /TAHAP\s*PENGUASAAN/gi,
-  /\bTAFSIRAN\b/gi,
   /\bPROJEK\b/g,
   /Murid boleh\s*:/gi,
 ];
@@ -15,6 +12,9 @@ const CODE_RE = /(\d+\.\d+\.\d+|\d+\.0|\d+\.\d+)/g;
 
 const PENANDA_TP =
   /\b(?:TAHAP\s*PENGUASAAN|STANDARD\s+PRESTASI|TAFSIRAN|RUBRIK(?:\s+PRESTASI)?|TP\s*[1-6])\b/i;
+
+const PENANDA_CADANGAN =
+  /\b(?:CADANGAN\s+AKTIVITI(?:\s+PdP)?|CADANGAN\s+PENGAJARAN(?:\s+DAN\s+PEMBELAJARAN)?|AKTIVITI\s+CADANGAN)\b/i;
 
 const KATA_KERJA_TP =
   "(?:Murid\\s+)?(?:dapat\\s+|boleh\\s+)?(?:Men|Mem|Meng|Mel|Mer|Menc)[A-Za-z]{3,}";
@@ -29,6 +29,8 @@ export function indeksTahapPenguasaan(text: string) {
   const calon: number[] = [];
   const penanda = text.search(PENANDA_TP);
   if (penanda >= 0) calon.push(penanda);
+  const cadangan = text.search(PENANDA_CADANGAN);
+  if (cadangan >= 0) calon.push(cadangan);
   const berturut = text.search(TP_BERTURUT);
   if (berturut >= 0) calon.push(berturut);
   const tahapSatu = text.search(TP_TAHAP_SATU);
@@ -41,7 +43,10 @@ export function buangTahapPenguasaan(text: string) {
   const terpotong = idx >= 0 ? text.slice(0, idx) : text;
   return compact(
     terpotong
-      .replace(/\b(?:STANDARD\s+PRESTASI|TAHAP\s*PENGUASAAN|TAFSIRAN|RUBRIK)\b/gi, " ")
+      .replace(
+        /\b(?:STANDARD\s+PRESTASI|TAHAP\s*PENGUASAAN|TAFSIRAN|RUBRIK|CADANGAN\s+AKTIVITI(?:\s+PdP)?|CADANGAN\s+PENGAJARAN(?:\s+DAN\s+PEMBELAJARAN)?|AKTIVITI\s+CADANGAN)\b/gi,
+        " "
+      )
       .replace(/\s+/g, " ")
   );
 }
@@ -53,7 +58,12 @@ function butiranTanpaTp(butiran: string[]) {
     .filter((item) => {
       if (!item) return false;
       if (/^(?:[1-6][\.\)\:]?|TP\s*[1-6])\b/i.test(item)) return false;
-      if (/^(?:Tahap\s*Penguasaan|Tafsiran|Standard\s+Prestasi)\b/i.test(item)) return false;
+      if (/^(?:Tahap\s*Penguasaan|Tafsiran|Standard\s+Prestasi|Cadangan\s+Aktiviti)\b/i.test(item)) {
+        return false;
+      }
+      if (/^(?:Guru\s+(?:membimbing|menunjukkan|mengedar|melaksanakan)|Murid\s+(?:menjalankan|membincangkan)\s)/i.test(item)) {
+        return false;
+      }
       return item.length > 2;
     });
 }
@@ -188,7 +198,12 @@ function isSpKod(kod: string) {
 }
 
 export function teksKurikulumDskp(text: string) {
-  return contentSection(text);
+  const tokens = tokenize(contentSection(normalise(text)));
+  const kurikulum = tokens
+    .map((token) => compact(`${token.kod} ${token.body}`))
+    .filter(Boolean)
+    .join("\n");
+  return kurikulum || contentSection(text);
 }
 
 function contentSection(text: string) {

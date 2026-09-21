@@ -22,11 +22,11 @@ function kodTeks(value: unknown) {
 
 export const standardPembelajaranSchema = z.object({
   kod: z.preprocess(kodTeks, z.string()).describe("Kod seperti 1.1.1"),
-  pernyataan: z.string().describe("Ayat standard pembelajaran tanpa nombor rumawi"),
+  pernyataan: z.string().describe("Ayat Standard Pembelajaran sahaja, tanpa Cadangan Aktiviti atau Tahap Penguasaan"),
   butiran: z
     .array(z.string())
     .catch([])
-    .describe("Sub-item (i), (ii), (iii) jika ada"),
+    .describe("Sub-item kurikulum (i), (ii), (iii) jika ada. Jangan masukkan Cadangan Aktiviti atau Tahap Penguasaan."),
 });
 
 export const standardKandunganSchema = z.object({
@@ -67,9 +67,13 @@ export const dskpAiSchema = z.object({
           tajuk: z.string(),
           standard_pembelajaran: z.array(
             z.object({
-              kod: z.string(),
-              pernyataan: z.string(),
-              butiran: z.array(z.string()),
+              kod: z.string().describe("Kod seperti 1.1.1"),
+              pernyataan: z
+                .string()
+                .describe("Ayat Standard Pembelajaran sahaja. Jangan masukkan Cadangan Aktiviti atau Tahap Penguasaan."),
+              butiran: z
+                .array(z.string())
+                .describe("Sub-item kurikulum (i)(ii)(iii) sahaja. Kosongkan jika tiada."),
             })
           ),
         })

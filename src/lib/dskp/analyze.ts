@@ -22,17 +22,23 @@ const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] as cons
 const MASA_AI_MS = 18_000;
 
 const INSTRUCTIONS = `Anda mengekstrak DSKP KSSM Malaysia.
-Ambil HANYA:
-1. Bidang Pembelajaran (kod seperti 1.0)
-2. Standard Kandungan (kod seperti 1.1)
-3. Standard Pembelajaran (kod seperti 1.1.1)
 
-JANGAN masukkan Standard Prestasi, Tahap Penguasaan 1-6, rubrik, atau Tafsiran.
-Lajur kanan DSKP (Tahap Penguasaan / Tafsiran) BUKAN standard pembelajaran.
-Jika ayat SP bersambung dengan "1 Menyatakan... 2 Menerangkan... 3 Mengaplikasi..." potong SEBELUM nombor 1 itu.
+Ambil HANYA tiga bahagian ini:
+1. Bidang Pembelajaran (kod seperti 1.0) — nama bidang sahaja
+2. Standard Kandungan (kod seperti 1.1) — tajuk SK sahaja
+3. Standard Pembelajaran (kod seperti 1.1.1) — ayat kurikulum sahaja
+
+JANGAN ambil, salin, gabung, atau simpan daripada lajur/bahagian lain:
+- Cadangan Aktiviti / Cadangan PdP / aktiviti cadangan
+- Tahap Penguasaan 1-6 / Standard Prestasi / Tafsiran / rubrik
+- Nota, glosari, rasional, pengenalan, projek
+
+Lajur kanan DSKP (Cadangan Aktiviti dan Tahap Penguasaan) BUKAN standard pembelajaran.
+Jika ayat SP bersambung dengan cadangan aktiviti atau "1 Menyatakan... 2 Menerangkan...", potong SEBELUM bahagian itu.
 pernyataan SP hanya ayat kurikulum, contoh: "Menerangkan keperluan penyelesaian masalah berstrategi"
 Jangan salin descriptor TP seperti "Menyatakan", "Menerangkan", "Mengaplikasi", "Menganalisis", "Menilai", "Mencipta" yang bernombor 1-6.
-Jika ada sub-item (i) (ii) (iii), letakkan dalam butiran. Jika tiada, butiran = [].
+Jika ada sub-item kurikulum (i) (ii) (iii), letakkan dalam butiran. Jika tiada, butiran = [].
+Jangan letak langkah aktiviti PdP dalam butiran.
 penerangan, tahun_terbitan, dan jam mesti string. Jika tiada, guna string kosong.
 jam contoh "20" atau "".
 Kekalkan bahasa asal dokumen.
@@ -150,10 +156,10 @@ async function analyzeWithAi(params: { text: string; parsed: DskpExtract }): Pro
   const kurikulum = teksKurikulumDskp(params.text);
   const prompt = `${INSTRUCTIONS}
 
-Hasil parser awal (betulkan jika salah atau tidak lengkap):
+Hasil parser awal (sudah ditapis kepada Bidang, Standard Kandungan, Standard Pembelajaran sahaja; betulkan jika salah atau tidak lengkap):
 ${hint.slice(0, 20000)}
 
-Teks DSKP (bahagian relevan):
+Teks kurikulum DSKP (tanpa Cadangan Aktiviti dan Tahap Penguasaan):
 ${kurikulum.slice(0, 25000)}`;
 
   const object = await janaDskpAi(prompt);

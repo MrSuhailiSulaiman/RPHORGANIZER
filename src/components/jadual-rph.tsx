@@ -338,7 +338,7 @@ export function JadualRph({
             </td>
           </tr>
           <tr>
-            <th className={labelCell}>Standar pembelajaran</th>
+            <th className={labelCell}>Standard pembelajaran</th>
             <td className={`${cell} space-y-2`} colSpan={5}>
               {spList.length ? (
                 spList.map((sp) => (
