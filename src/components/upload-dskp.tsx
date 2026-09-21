@@ -2,15 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FileUp, Loader2 } from "lucide-react";
+import { FileUp, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DskpEditor } from "@/components/dskp-editor";
 import { DskpTree } from "@/components/dskp-tree";
 import { TINGKATAN, sahkanMaklumatDskp } from "@/lib/dskp/maklumat";
+import { ringkasanExtract } from "@/lib/dskp/parse";
 import type { DskpExtract } from "@/lib/dskp/types";
 
 type Ringkasan = { bilBidang: number; bilSk: number; bilSp: number };
@@ -28,6 +30,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [storagePath, setStoragePath] = useState("");
   const [seret, setSeret] = useState(false);
+  const [sedangEdit, setSedangEdit] = useState(false);
 
   const maklumat = sahkanMaklumatDskp(mataPelajaran, tingkatan);
   const maklumatLengkap = !("ralat" in maklumat);
@@ -107,6 +110,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
     setSedangAnalisis(true);
     setExtract(null);
     setStoragePath("");
+    setSedangEdit(false);
     try {
       let res: Response;
       let path = storagePath;
@@ -180,7 +184,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
       }
       const json = await bacaJson(res);
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan.");
-      toast.success("DSKP disimpan ke Supabase.");
+      toast.success("DSKP disimpan.");
       router.push(`/dskp/${json.id}`);
       router.refresh();
     } catch (error) {
@@ -263,6 +267,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
                 setFail(dropped);
                 setExtract(null);
                 setStoragePath("");
+                setSedangEdit(false);
               }
             }}
             className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center transition-colors ${
@@ -281,6 +286,7 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
                 setFail(next);
                 setExtract(null);
                 setStoragePath("");
+                setSedangEdit(false);
               }}
             />
           </label>
@@ -323,13 +329,35 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
             </div>
             <p className="text-xs text-muted-foreground">
               Kaedah: {extract.kaedah_analisis === "ai" ? "Analisis AI" : "Parser DSKP"}
+              {sedangEdit ? " · Edit hasil sebelum simpan." : ""}
             </p>
-            <DskpTree bidang={extract.bidang} />
+            {sedangEdit ? (
+              <DskpEditor
+                bidang={extract.bidang}
+                onChange={(bidang) => {
+                  const seterusnya = { ...extract, bidang };
+                  setExtract(seterusnya);
+                  setRingkasan(ringkasanExtract(seterusnya));
+                }}
+              />
+            ) : (
+              <DskpTree bidang={extract.bidang} />
+            )}
             <div className="space-y-2">
-              <Button onClick={simpan} disabled={!maklumatLengkap || sedangSimpan}>
-                {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
-                Simpan ke Supabase
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSedangEdit((nilai) => !nilai)}
+                >
+                  <Pencil />
+                  {sedangEdit ? "Selesai edit" : "Edit"}
+                </Button>
+                <Button onClick={simpan} disabled={!maklumatLengkap || sedangSimpan}>
+                  {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
+                  Simpan DSKP
+                </Button>
+              </div>
               {!maklumatLengkap ? (
                 <p className="text-sm text-destructive">Isi mata pelajaran dan tingkatan di atas sebelum simpan.</p>
               ) : null}

@@ -70,8 +70,8 @@ export default function PanduanPage() {
               klik <strong className="text-foreground">Analisis PDF</strong>.
             </li>
             <li>
-              Semak Bidang, SK, dan SP. Jika betul, klik{" "}
-              <strong className="text-foreground">Simpan ke Supabase</strong>.
+              Semak Bidang, SK, dan SP. Klik <strong className="text-foreground">Edit</strong> jika
+              perlu betulkan, kemudian klik <strong className="text-foreground">Simpan DSKP</strong>.
             </li>
           </ol>
           <div className="flex flex-wrap gap-2">
