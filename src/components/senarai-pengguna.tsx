@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Loader2, Users } from "lucide-react";
+import { CalendarClock, ClipboardList, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,16 +74,24 @@ export function SenaraiPengguna() {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              {item.bil_rph} RPH
+              {item.bil_sesi} sesi · {item.bil_rph} RPH
               {item.created_at ? ` · Daftar ${formatTarikhDaftar(item.created_at)}` : ""}
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/pengguna/${item.id}`}>
-              <ClipboardList />
-              Lihat RPH
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/pengguna/${item.id}/jadual`}>
+                <CalendarClock />
+                Lihat jadual
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/pengguna/${item.id}`}>
+                <ClipboardList />
+                Lihat RPH
+              </Link>
+            </Button>
+          </div>
         </div>
       ))}
     </div>

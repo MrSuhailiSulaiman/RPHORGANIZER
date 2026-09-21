@@ -14,7 +14,7 @@ export default async function PenggunaPage() {
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Senarai pengguna</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Lihat guru yang berdaftar dan RPH yang telah mereka hasilkan.
+          Lihat jadual waktu dan RPH setiap guru. Guru biasa hanya nampak data sendiri.
         </p>
       </div>
       <SenaraiPengguna />

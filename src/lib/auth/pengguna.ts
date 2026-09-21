@@ -12,6 +12,7 @@ export type RekodPengguna = {
 export type RekodPenggunaSenarai = RekodPengguna & {
   created_at: string;
   bil_rph: number;
+  bil_sesi: number;
 };
 
 const ADMIN_NAMA = "admin";
@@ -148,19 +149,29 @@ export async function senaraiPengguna(): Promise<RekodPenggunaSenarai[]> {
   const senarai = data ?? [];
   const kiraan = await Promise.all(
     senarai.map(async (row) => {
-      const { count } = await supabase
-        .from("rph")
-        .select("id", { count: "exact", head: true })
-        .eq("pengguna_id", row.id)
-        .neq("mata_pelajaran", "__DIPADAM__");
-      return [row.id as string, count ?? 0] as const;
+      const [{ count: bilRph }, { count: bilSesi }] = await Promise.all([
+        supabase
+          .from("rph")
+          .select("id", { count: "exact", head: true })
+          .eq("pengguna_id", row.id)
+          .neq("mata_pelajaran", "__DIPADAM__"),
+        supabase
+          .from("sesi_pdp")
+          .select("id", { count: "exact", head: true })
+          .eq("pengguna_id", row.id),
+      ]);
+      return [row.id as string, { bil_rph: bilRph ?? 0, bil_sesi: bilSesi ?? 0 }] as const;
     })
   );
   const peta = new Map(kiraan);
 
-  return senarai.map((row) => ({
-    ...petaPengguna(row),
-    created_at: row.created_at ? String(row.created_at) : "",
-    bil_rph: peta.get(row.id) ?? 0,
-  }));
+  return senarai.map((row) => {
+    const bil = peta.get(row.id) ?? { bil_rph: 0, bil_sesi: 0 };
+    return {
+      ...petaPengguna(row),
+      created_at: row.created_at ? String(row.created_at) : "",
+      bil_rph: bil.bil_rph,
+      bil_sesi: bil.bil_sesi,
+    };
+  });
 }

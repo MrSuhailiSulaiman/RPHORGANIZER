@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, Download, LayoutList, Loader2 } from "lucide-react";
+import { ArrowLeft, CalendarClock, ClipboardList, Download, LayoutList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,9 +97,17 @@ export function SenaraiRphPengguna({ penggunaId }: { penggunaId: string }) {
             Semak RPH yang dihasilkan oleh pengguna ini. Paparan untuk lihat sahaja.
           </p>
         </div>
-        <Badge variant={pengguna?.peranan === "admin" ? "default" : "secondary"}>
-          {pengguna?.peranan === "admin" ? "Admin" : "Pengguna"}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={pengguna?.peranan === "admin" ? "default" : "secondary"}>
+            {pengguna?.peranan === "admin" ? "Admin" : "Pengguna"}
+          </Badge>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/pengguna/${penggunaId}/jadual`}>
+              <CalendarClock />
+              Jadual waktu
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {kumpulanMinggu.length ? (
