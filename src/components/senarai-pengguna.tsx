@@ -70,7 +70,7 @@ export function SenaraiPengguna() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{item.nama_pengguna}</p>
               <Badge variant={item.peranan === "admin" ? "default" : "secondary"}>
-                {item.peranan === "admin" ? "Admin" : "Pengguna"}
+                {item.peranan === "admin" ? "Admin" : "Pengguna Biasa"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">

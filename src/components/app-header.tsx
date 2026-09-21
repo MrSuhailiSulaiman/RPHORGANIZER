@@ -67,7 +67,7 @@ export function AppHeader({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium uppercase">{pengguna.nama}</span>
                   <Badge variant={pengguna.peranan === "admin" ? "default" : "secondary"}>
-                    {pengguna.peranan === "admin" ? "Admin" : "Pengguna"}
+                    {pengguna.peranan === "admin" ? "Admin" : "Pengguna Biasa"}
                   </Badge>
                 </div>
                 <form action="/api/auth/keluar" method="post">

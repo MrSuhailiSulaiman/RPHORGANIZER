@@ -99,7 +99,7 @@ export function SenaraiRphPengguna({ penggunaId }: { penggunaId: string }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={pengguna?.peranan === "admin" ? "default" : "secondary"}>
-            {pengguna?.peranan === "admin" ? "Admin" : "Pengguna"}
+            {pengguna?.peranan === "admin" ? "Admin" : "Pengguna Biasa"}
           </Badge>
           <Button asChild variant="outline" size="sm">
             <Link href={`/pengguna/${penggunaId}/jadual`}>
