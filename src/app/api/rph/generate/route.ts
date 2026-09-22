@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
+import { PERATUS_REFLEKSI_ASAL } from "@/lib/rph/borang";
 import { janaBahanKurikulum, pilihAktivitiUntukSesi, type BahanRph } from "@/lib/rph/generate";
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
@@ -148,6 +149,7 @@ export async function POST(request: Request) {
           indeks,
           `${slot.tarikh}|${slot.sesi.kelas}|${slot.sesi.masa}|${unit?.sk_kod ?? ""}`
         ),
+        refleksi_peratus: PERATUS_REFLEKSI_ASAL,
         refleksi_berjaya: true,
       };
     });

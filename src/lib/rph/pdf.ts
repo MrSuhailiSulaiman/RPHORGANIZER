@@ -1,5 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, PageSizes, rgb, StandardFonts } from "pdf-lib";
 import { HARI_LIST } from "@/lib/jadual/types";
+import { PERATUS_REFLEKSI_ASAL } from "./borang";
 import type { RphRekod } from "./types";
 
 const MARGIN = 36;
@@ -263,8 +264,9 @@ function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: nu
 
   pelukis.barisLabel("RINGKASAN AKTIVITI", senaraiNombor(rekod.aktiviti) || "-");
 
+  const peratus = rekod.refleksi_peratus ?? PERATUS_REFLEKSI_ASAL;
   const refleksi = [
-    rekod.refleksi_peratus != null ? `${rekod.refleksi_peratus}%` : "",
+    `Peratus penguasaan: ${peratus}%`,
     rekod.refleksi_berjaya === false
       ? "Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
       : "Murid berjaya menguasai objektif pembelajaran dengan baik",
