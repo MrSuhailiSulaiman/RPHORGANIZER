@@ -4,7 +4,7 @@ import { wajibSesi } from "@/lib/auth/penjaga";
 import { senaraiSesi } from "@/lib/jadual/save";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { PERATUS_REFLEKSI_ASAL } from "@/lib/rph/borang";
-import { janaBahanKurikulum, pilihAktivitiUntukSesi, type BahanRph } from "@/lib/rph/generate";
+import { bahanSandaran, janaBahanKurikulum, pilihAktivitiUntukSesi } from "@/lib/rph/generate";
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
@@ -74,49 +74,7 @@ export async function POST(request: Request) {
       bahanMengikutDokumen.set(item.dokumen_id, await janaBahanKurikulum(item));
     }
 
-    const sandaran: BahanRph = {
-      objektif: [
-        "Murid dapat menyatakan 3 contoh isi pelajaran secara bertulis berdasarkan 1 senario yang diberi, dengan 2 justifikasi yang tepat.",
-        "Murid dapat menyenaraikan 4 langkah aktiviti PdP dalam masa 10 minit, kemudian membentangkan sekurang-kurangnya 2 hujah yang logik.",
-      ],
-      bbm: "Buku teks, lembaran kerja, kertas sebak, kad soalan, projektor LCD",
-      nilai: "PEMIKIR",
-      aktiviti: [
-        "Set induksi: murid meneliti 1 senario dan menyatakan 2 jawapan awal kepada rakan sebelah.",
-        "Murid berpasangan menyenaraikan 4 isi pada kertas sebak berdasarkan senario.",
-        "Pasangan berkongsi 3 contoh dengan rakan lain selama 6 minit dan menambah 1 isi.",
-        "Perwakilan membentangkan 2 hujah manakala rakan menanda senarai semak.",
-        "Murid individu menulis 3 contoh dan 2 justifikasi pada lembaran kerja.",
-        "Murid menyemak nombor dalam objektif bersama rakan sebelum penutup.",
-      ],
-      variasi: [
-        [
-          "Set induksi: murid meneliti 1 senario dan menyatakan 2 jawapan awal kepada rakan sebelah.",
-          "Murid berpasangan menyenaraikan 4 isi pada kertas sebak berdasarkan senario.",
-          "Pasangan berkongsi 3 contoh dengan rakan lain selama 6 minit dan menambah 1 isi.",
-          "Perwakilan membentangkan 2 hujah manakala rakan menanda senarai semak.",
-          "Murid individu menulis 3 contoh dan 2 justifikasi pada lembaran kerja.",
-          "Murid menyemak nombor dalam objektif bersama rakan sebelum penutup.",
-        ],
-        [
-          "Set induksi: murid di 3 stesen meneka 2 jawapan pada kad soalan, kemudian pusing stesen.",
-          "Kumpulan 4 orang menghasilkan 1 peta minda dengan 4 cabang dan 3 contoh.",
-          "Dua kumpulan bertukar hasil dan menambah 2 komen pembetulan dalam masa 8 minit.",
-          "Murid jigsaw mengajar rakan 2 isi pakar, rakan mencatat 3 isi baharu.",
-          "Setiap murid selesaikan cabaran 10 minit: 3 contoh dengan 2 justifikasi.",
-          "Kelas menyemak 2 hasil rakan dan menutup dengan 1 soalan exit ticket.",
-        ],
-      ],
-      masteri: [
-        "Set induksi: murid menanda sendiri tahap penguasaan (sudah kuasai / belum) pada kad exit.",
-        "Murid individu menjawab kuiz masteri 5 item dalam masa 8 minit tanpa nota.",
-        "Rakan semak menukar kertas dan menanda 5 item menggunakan senarai semak.",
-        "Murid yang belum kuasai mengulang 3 contoh dengan bantuan rakan.",
-        "Perwakilan mendemonstrasikan 1 tugasan prestasi selama 2 minit sebagai bukti penguasaan.",
-        "Murid mengemaskini peta masteri dan menulis 1 langkah susulan sebelum penutup.",
-      ],
-    };
-
+    const sandaran = bahanSandaran();
     const kiraanSk = new Map<string, number>();
     const rekod = slots.map((slot) => {
       const unit = unitUntukSlot(slot, kurikulum);
@@ -144,11 +102,7 @@ export async function POST(request: Request) {
         objektif: bahan.objektif,
         bbm: bahan.bbm,
         nilai: bahan.nilai,
-        aktiviti: pilihAktivitiUntukSesi(
-          bahan,
-          indeks,
-          `${slot.tarikh}|${slot.sesi.kelas}|${slot.sesi.masa}|${unit?.sk_kod ?? ""}`
-        ),
+        aktiviti: pilihAktivitiUntukSesi(bahan, indeks, kunci),
         refleksi_peratus: PERATUS_REFLEKSI_ASAL,
         refleksi_berjaya: true,
       };
