@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
-import { janaBahanSesi, janaObjektifSesi, pilihKaedahPdP } from "@/lib/rph/generate";
+import {
+  bahanSandaran,
+  janaBahanSesi,
+  janaObjektifSesi,
+  pilihAktivitiUntukSesi,
+  pilihKaedahPdP,
+} from "@/lib/rph/generate";
 import { geminiApiKey } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
@@ -9,18 +15,15 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const maxDuration = 90;
 
+const SEBAB_TIADA_KUNCI =
+  "Kunci Gemini belum dikonfigurasi. Isi GOOGLE_GENERATIVE_AI_API_KEY dalam .env.local, atau pada Vercel kemudian deploy semula.";
+
 export async function POST(request: Request) {
   const auth = await wajibSesi();
   if (auth.ralat) return auth.ralat;
   try {
     const kunci = await kunciGemini();
     geminiApiKey();
-    if (!kunci) {
-      return NextResponse.json(
-        { ralat: "Kunci Gemini belum dikonfigurasi. Generate RPH sesi tidak dapat dijalankan." },
-        { status: 500 }
-      );
-    }
 
     const body = (await request.json().catch(() => ({}))) as {
       mata_pelajaran?: string;
@@ -60,6 +63,7 @@ export async function POST(request: Request) {
       String(Date.now()),
     ].join("|");
     const masteri = Date.now() % 4 === 0;
+    const hanyaObjektif = String(body.skop ?? "").trim() === "objektif";
     const konteks = {
       mata_pelajaran: String(body.mata_pelajaran ?? "").trim(),
       tingkatan: String(body.tingkatan ?? "").trim(),
@@ -74,14 +78,37 @@ export async function POST(request: Request) {
       masteri,
     };
 
-    if (String(body.skop ?? "").trim() === "objektif") {
-      const objektif = await janaObjektifSesi(konteks);
-      return NextResponse.json({ objektif }, { headers: { "Cache-Control": "no-store" } });
+    /** Guru tidak boleh tersekat: beri templat yang boleh disunting apabila Gemini gagal. */
+    function sandaran(sebab: string) {
+      const bahan = bahanSandaran(konteks.sk_tajuk || konteks.sk_kod || standard[0].pernyataan);
+      const isi = hanyaObjektif
+        ? { objektif: bahan.objektif }
+        : {
+            objektif: bahan.objektif,
+            bbm: bahan.bbm,
+            nilai: bahan.nilai,
+            aktiviti: pilihAktivitiUntukSesi(bahan, Math.floor(Math.random() * 3), biji),
+          };
+      return NextResponse.json(
+        { ...isi, sandaran: true, sebab },
+        { headers: { "Cache-Control": "no-store" } }
+      );
     }
 
-    const bahan = await janaBahanSesi(konteks);
+    if (!kunci) return sandaran(SEBAB_TIADA_KUNCI);
 
-    return NextResponse.json(bahan, { headers: { "Cache-Control": "no-store" } });
+    try {
+      if (hanyaObjektif) {
+        const objektif = await janaObjektifSesi(konteks);
+        return NextResponse.json({ objektif }, { headers: { "Cache-Control": "no-store" } });
+      }
+      const bahan = await janaBahanSesi(konteks);
+      return NextResponse.json(bahan, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      const mesej = error instanceof Error ? error.message : "Gemini gagal menjana kandungan RPH.";
+      console.error("generate_sesi_gemini", mesej);
+      return sandaran(mesej);
+    }
   } catch (error) {
     const mesej = error instanceof Error ? error.message : "Gagal menjana RPH sesi.";
     return NextResponse.json({ ralat: mesej }, { status: 500 });

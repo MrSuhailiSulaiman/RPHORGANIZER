@@ -205,6 +205,8 @@ export function BorangRph({
         aktiviti?: string[];
         bbm?: string;
         nilai?: string;
+        sandaran?: boolean;
+        sebab?: string;
       };
       if (masa !== janaMasa.current) return;
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana RPH sesi.");
@@ -219,11 +221,15 @@ export function BorangRph({
             }
           : {}),
       }));
-      toast.success(
-        skop === "objektif"
-          ? "Objektif dijana daripada standard pembelajaran. Semak, atau Generate RPH untuk aktiviti."
-          : "Objektif dan aktiviti berpusatkan murid telah dijana. Semak kemudian simpan."
-      );
+      if (json.sandaran) {
+        toast.warning(json.sebab ?? "Gemini tidak dapat dihubungi. Templat digunakan — sila semak dan ubah.");
+      } else {
+        toast.success(
+          skop === "objektif"
+            ? "Objektif dijana daripada standard pembelajaran. Semak, atau Generate RPH untuk aktiviti."
+            : "Objektif dan aktiviti berpusatkan murid telah dijana. Semak kemudian simpan."
+        );
+      }
     } catch (error) {
       if (masa !== janaMasa.current) return;
       toast.error(error instanceof Error ? error.message : "Gagal menjana RPH sesi.");
