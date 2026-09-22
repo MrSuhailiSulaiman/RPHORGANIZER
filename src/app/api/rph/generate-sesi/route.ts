@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
-import { janaBahanSesi, janaObjektifSesi } from "@/lib/rph/generate";
+import { janaBahanSesi, janaObjektifSesi, pilihGayaPdP } from "@/lib/rph/generate";
 import { geminiApiKey } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
@@ -51,6 +51,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const biji = [
+      String(body.mata_pelajaran ?? ""),
+      String(body.kelas ?? ""),
+      String(body.hari ?? ""),
+      String(body.masa ?? ""),
+      String(body.sk_kod ?? ""),
+      String(Date.now()),
+    ].join("|");
+    const masteri = Date.now() % 4 === 0;
     const konteks = {
       mata_pelajaran: String(body.mata_pelajaran ?? "").trim(),
       tingkatan: String(body.tingkatan ?? "").trim(),
@@ -61,6 +70,8 @@ export async function POST(request: Request) {
       sk_kod: String(body.sk_kod ?? "").trim(),
       sk_tajuk: String(body.sk_tajuk ?? "").trim(),
       standard_pembelajaran: standard,
+      gaya: pilihGayaPdP(biji, masteri),
+      masteri,
     };
 
     if (String(body.skop ?? "").trim() === "objektif") {
