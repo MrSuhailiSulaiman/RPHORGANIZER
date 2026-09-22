@@ -72,13 +72,15 @@ function muatKurikulum(mata: string, tingkatan: string) {
 
 export function JadualRph({
   borang,
-  onChange,
+  onChange = () => undefined,
   sedangJana = false,
+  bacaSahaja = false,
   onTogolSp,
 }: {
   borang: BorangRphNilai;
-  onChange: (borang: BorangRphNilai) => void;
+  onChange?: (borang: BorangRphNilai) => void;
   sedangJana?: boolean;
+  bacaSahaja?: boolean;
   onTogolSp?: (sp: RphStandard, checked: boolean) => void;
 }) {
   const [kurikulum, setKurikulum] = useState<KurikulumPilihan | null>(null);
@@ -88,7 +90,7 @@ export function JadualRph({
   onChangeRujukan.current = onChange;
 
   useEffect(() => {
-    if (!borang.mata_pelajaran) {
+    if (bacaSahaja || !borang.mata_pelajaran) {
       setKurikulum(null);
       return;
     }
@@ -99,11 +101,12 @@ export function JadualRph({
     return () => {
       hidup = false;
     };
-  }, [borang.mata_pelajaran, borang.tingkatan]);
+  }, [bacaSahaja, borang.mata_pelajaran, borang.tingkatan]);
 
   const bidang = kurikulum?.bidang ?? [];
 
   useEffect(() => {
+    if (bacaSahaja) return;
     const senarai = kurikulum?.bidang ?? [];
     if (!senarai.length) return;
     const current = borangRujukan.current;
@@ -139,7 +142,7 @@ export function JadualRph({
       sk_kod: sk.kod,
       sk_tajuk: gabungKodTajuk(sk.kod, sk.tajuk),
     });
-  }, [kurikulum, borang.id, borang.sk_kod, borang.sk_tajuk, borang.bidang_kod]);
+  }, [bacaSahaja, kurikulum, borang.id, borang.sk_kod, borang.sk_tajuk, borang.bidang_kod]);
 
   const skList = useMemo(() => {
     const pilih =
@@ -156,6 +159,7 @@ export function JadualRph({
   const bidangDalamSenarai = bidang.some((item) => samaKod(item.kod, borang.bidang_kod));
 
   function kemaskini(patch: Partial<BorangRphNilai>) {
+    if (bacaSahaja) return;
     onChange({ ...borang, ...patch });
   }
 
@@ -197,8 +201,9 @@ export function JadualRph({
     });
   }
 
-  const rupaRadio =
-    "size-4 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]";
+  const rupaRadio = bacaSahaja
+    ? "size-4 shrink-0 appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]"
+    : "size-4 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]";
 
   return (
     <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
@@ -217,6 +222,7 @@ export function JadualRph({
                 type="date"
                 className={field}
                 value={borang.tarikh}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ tarikh: event.target.value })}
               />
             </td>
@@ -224,6 +230,7 @@ export function JadualRph({
               <select
                 className={`${field} bg-white`}
                 value={borang.hari}
+                disabled={bacaSahaja}
                 onChange={(event) =>
                   kemaskini({
                     hari: event.target.value,
@@ -242,6 +249,7 @@ export function JadualRph({
               <Input
                 className={field}
                 value={borang.masa}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ masa: event.target.value })}
               />
             </td>
@@ -249,6 +257,7 @@ export function JadualRph({
               <Input
                 className={field}
                 value={borang.tingkatan.replace(/^Tingkatan\s+/i, "")}
+                readOnly={bacaSahaja}
                 onChange={(event) =>
                   kemaskini({
                     tingkatan: event.target.value
@@ -262,6 +271,7 @@ export function JadualRph({
               <Input
                 className={field}
                 value={borang.kelas}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ kelas: event.target.value })}
               />
             </td>
@@ -269,6 +279,7 @@ export function JadualRph({
               <Input
                 className={`${field} uppercase`}
                 value={borang.mata_pelajaran}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ mata_pelajaran: event.target.value })}
               />
             </td>
@@ -278,7 +289,9 @@ export function JadualRph({
           <tr>
             <th className={labelCell}>Bidang pembelajaran</th>
             <td className={cell} colSpan={5}>
-              {bidang.length ? (
+              {bacaSahaja ? (
+                <p>{borang.bidang_nama || "—"}</p>
+              ) : bidang.length ? (
                 <select
                   className={`${field} bg-white`}
                   value={borang.bidang_kod}
@@ -309,7 +322,9 @@ export function JadualRph({
           <tr>
             <th className={labelCell}>Standard kandungan</th>
             <td className={cell} colSpan={5}>
-              {skList.length ? (
+              {bacaSahaja ? (
+                <p>{borang.sk_tajuk || borang.sk_kod || "—"}</p>
+              ) : skList.length ? (
                 <select
                   className={`${field} bg-white`}
                   value={skDalamSenarai ? borang.sk_kod : borang.sk_kod || borang.sk_tajuk}
@@ -340,7 +355,20 @@ export function JadualRph({
           <tr>
             <th className={labelCell}>Standard pembelajaran</th>
             <td className={`${cell} space-y-2`} colSpan={5}>
-              {spList.length ? (
+              {bacaSahaja ? (
+                borang.standard_pembelajaran.length ? (
+                  <ul className="space-y-1">
+                    {borang.standard_pembelajaran.map((sp, indeks) => (
+                      <li key={sp.kod || `sp-${indeks}`}>
+                        {sp.kod ? <span className="font-medium">{sp.kod} </span> : null}
+                        {sp.pernyataan}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-slate-500">—</p>
+                )
+              ) : spList.length ? (
                 spList.map((sp) => (
                   <label key={sp.kod} className="flex items-start gap-2 text-sm">
                     <input
@@ -387,6 +415,7 @@ export function JadualRph({
                   key={index}
                   className="min-h-16 rounded-none border-0 shadow-none focus-visible:ring-0"
                   value={item}
+                  readOnly={bacaSahaja}
                   placeholder="Murid dapat ... (terperinci dan boleh diukur)"
                   onChange={(event) =>
                     kemaskini({
@@ -397,14 +426,16 @@ export function JadualRph({
                   }
                 />
               ))}
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                onClick={() => kemaskini({ objektif: [...borang.objektif, ""] })}
-              >
-                Tambah objektif
-              </Button>
+              {bacaSahaja ? null : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => kemaskini({ objektif: [...borang.objektif, ""] })}
+                >
+                  Tambah objektif
+                </Button>
+              )}
             </td>
           </tr>
           <tr>
@@ -413,6 +444,7 @@ export function JadualRph({
               <Input
                 className={field}
                 value={borang.bbm}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ bbm: event.target.value })}
               />
             </td>
@@ -421,6 +453,7 @@ export function JadualRph({
               <Input
                 className={`${field} text-center font-semibold uppercase`}
                 value={borang.nilai}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ nilai: event.target.value })}
               />
             </td>
@@ -434,6 +467,7 @@ export function JadualRph({
                   <Textarea
                     className="min-h-16 rounded-none border-0 shadow-none focus-visible:ring-0"
                     value={item}
+                    readOnly={bacaSahaja}
                     onChange={(event) =>
                       kemaskini({
                         aktiviti: borang.aktiviti.map((nilai, i) =>
@@ -444,14 +478,16 @@ export function JadualRph({
                   />
                 </div>
               ))}
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                onClick={() => kemaskini({ aktiviti: [...borang.aktiviti, ""] })}
-              >
-                Tambah aktiviti
-              </Button>
+              {bacaSahaja ? null : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => kemaskini({ aktiviti: [...borang.aktiviti, ""] })}
+                >
+                  Tambah aktiviti
+                </Button>
+              )}
             </td>
           </tr>
           <tr>
@@ -463,17 +499,19 @@ export function JadualRph({
                 <Input
                   className={`${field} w-16 text-center`}
                   value={borang.refleksi_peratus}
+                  readOnly={bacaSahaja}
                   onChange={(event) => kemaskini({ refleksi_peratus: event.target.value })}
                 />
                 <span>%</span>
               </div>
             </td>
             <td className={cell} colSpan={4}>
-              <label className="flex cursor-pointer items-center gap-2">
+              <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   className={rupaRadio}
                   checked={borang.refleksi_berjaya === "ya"}
+                  disabled={bacaSahaja}
                   onChange={() => pilihRefleksi("ya")}
                   aria-label="Murid berjaya menguasai objektif pembelajaran dengan baik"
                 />
@@ -487,11 +525,12 @@ export function JadualRph({
           <tr>
             <td className={cell} colSpan={1} />
             <td className={cell} colSpan={4}>
-              <label className="flex cursor-pointer items-center gap-2">
+              <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   className={rupaRadio}
                   checked={borang.refleksi_berjaya === "tidak"}
+                  disabled={bacaSahaja}
                   onChange={() => pilihRefleksi("tidak")}
                   aria-label="Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
                 />
@@ -508,6 +547,7 @@ export function JadualRph({
                 className="min-h-16 rounded-none border-0 shadow-none focus-visible:ring-0"
                 placeholder="Catatan refleksi..."
                 value={borang.refleksi_catatan}
+                readOnly={bacaSahaja}
                 onChange={(event) => kemaskini({ refleksi_catatan: event.target.value })}
               />
             </td>

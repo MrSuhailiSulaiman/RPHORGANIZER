@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ButangKongsiRph } from "@/components/butang-kongsi-rph";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
@@ -164,6 +165,10 @@ export function PaparMingguRph() {
             {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
             Download RPH
           </Button>
+          <ButangKongsiRph
+            minggu={minggu || kumpulanMinggu[0]?.minggu || 0}
+            disabled={!borang.length || !(minggu || kumpulanMinggu[0]?.minggu)}
+          />
           <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan || !borang.length}>
             {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
             Simpan
@@ -201,6 +206,10 @@ export function PaparMingguRph() {
           {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
           Download RPH
         </Button>
+        <ButangKongsiRph
+          minggu={minggu || kumpulanMinggu[0]?.minggu || 0}
+          disabled={!borang.length || !(minggu || kumpulanMinggu[0]?.minggu)}
+        />
         <Button type="button" onClick={() => void simpanSemua()} disabled={sedangSimpan}>
           {sedangSimpan ? <Loader2 className="animate-spin" /> : null}
           Simpan

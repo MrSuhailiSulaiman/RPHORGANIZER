@@ -9,6 +9,8 @@ export async function middleware(request: NextRequest) {
     path === "/api/auth/masuk" ||
     path === "/api/auth/keluar" ||
     path === "/api/auth/saya" ||
+    path.startsWith("/kongsi") ||
+    path.startsWith("/api/kongsi") ||
     path.startsWith("/_next") ||
     path === "/favicon.ico";
   const sesi = await bacaMuatanSesi(request.cookies.get(NAMA_KUKI_SESI)?.value);
