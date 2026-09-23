@@ -47,7 +47,7 @@ export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
     nilai: NILAI_ASAL,
     aktiviti: ["", "", "", "", "", ""],
     refleksi_peratus: String(PERATUS_REFLEKSI_ASAL),
-    refleksi_berjaya: "ya",
+    refleksi_berjaya: "",
     refleksi_catatan: "",
   };
 }
@@ -73,7 +73,7 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
     aktiviti: rekod.aktiviti.length ? rekod.aktiviti : ["", "", "", "", "", ""],
     refleksi_peratus:
       rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : String(PERATUS_REFLEKSI_ASAL),
-    refleksi_berjaya: rekod.refleksi_berjaya == null ? "ya" : rekod.refleksi_berjaya ? "ya" : "tidak",
+    refleksi_berjaya: rekod.refleksi_berjaya == null ? "" : rekod.refleksi_berjaya ? "ya" : "tidak",
     refleksi_catatan: rekod.refleksi_catatan ?? "",
   };
 }

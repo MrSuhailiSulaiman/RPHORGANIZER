@@ -123,7 +123,17 @@ async function tulisBarisRph(
     .upsert(baris, { onConflict: "id", ignoreDuplicates: false, defaultToNull: false })
     .select("id")
     .maybeSingle();
-  if (!error && data?.id) return String(data.id);
+  if (!error && data?.id) {
+    await supabase
+      .from("rph")
+      .update({
+        refleksi_peratus: baris.refleksi_peratus,
+        refleksi_berjaya: baris.refleksi_berjaya,
+        refleksi_catatan: baris.refleksi_catatan,
+      })
+      .eq("id", data.id);
+    return String(data.id);
+  }
 
   const rpc = await supabase.rpc("simpan_rph", { payload: baris });
   if (rpc.error) throw error ? skemaRalat(error) : skemaRalat(rpc.error);

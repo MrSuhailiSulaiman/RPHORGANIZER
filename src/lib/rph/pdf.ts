@@ -36,8 +36,24 @@ function isi(nilai: string | null | undefined) {
   return bersih || "-";
 }
 
+export function teksRefleksiPdf(rekod: RphRekod) {
+  if (rekod.refleksi_berjaya == null) return "";
+  const peratus = rekod.refleksi_peratus ?? PERATUS_REFLEKSI_ASAL;
+  return [
+    `Peratus penguasaan: ${peratus}%`,
+    rekod.refleksi_berjaya
+      ? "Murid berjaya menguasai objektif pembelajaran dengan baik"
+      : "Murid tidak berjaya menguasai objektif pembelajaran dengan baik",
+    rekod.refleksi_catatan ?? "",
+  ]
+    .map((item) => teksPdf(item))
+    .filter(Boolean)
+    .join("\n");
+}
+
 function pecahBaris(font: PDFFont, teks: string, saiz: number, lebar: number) {
-  const sumber = teksPdf(teks) || "-";
+  const sumber = teksPdf(teks);
+  if (!sumber) return teks === "" ? [""] : ["-"];
   const keluar: string[] = [];
   for (const perenggan of sumber.split(/\n/)) {
     const perkataan = perenggan.split(/\s+/).filter(Boolean);
@@ -268,18 +284,7 @@ function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: nu
 
   pelukis.barisLabel("RINGKASAN AKTIVITI", senaraiNombor(rekod.aktiviti) || "-");
 
-  const peratus = rekod.refleksi_peratus ?? PERATUS_REFLEKSI_ASAL;
-  const refleksi = [
-    `Peratus penguasaan: ${peratus}%`,
-    rekod.refleksi_berjaya === false
-      ? "Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
-      : "Murid berjaya menguasai objektif pembelajaran dengan baik",
-    rekod.refleksi_catatan ?? "",
-  ]
-    .map((item) => teksPdf(item))
-    .filter(Boolean)
-    .join("\n");
-  pelukis.barisLabel("REFLEKSI", refleksi || "-");
+  pelukis.barisLabel("REFLEKSI", teksRefleksiPdf(rekod));
   pelukis.y -= 18;
 }
 
