@@ -90,7 +90,21 @@ export function supabaseRuntimeConfig() {
   };
 }
 
+function kunciGeminiStatik() {
+  return (
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    ""
+  ).trim();
+}
+
 export function geminiApiKey() {
+  const terus = kunciGeminiStatik();
+  if (terus) {
+    tetapkanGeminiEnv(terus);
+    return terus;
+  }
   const semua = semuaEnv();
   const names = [
     ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
@@ -112,13 +126,8 @@ export function geminiApiKey() {
 
 export function tetapkanGeminiEnv(key: string) {
   if (!key) return;
-  const names = [
-    ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
-    ["GEMINI", "API", "KEY"].join("_"),
-  ];
-  const bag = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  for (const nama of names) {
-    env[nama] = key;
-    if (bag) bag[nama] = key;
-  }
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = key;
+  process.env.GEMINI_API_KEY = key;
+  env.GOOGLE_GENERATIVE_AI_API_KEY = key;
+  env.GEMINI_API_KEY = key;
 }

@@ -94,8 +94,8 @@ export const KAEDAH_MASTERI = [
   "demonstrasi ketua kumpulan, rakan menilai bukti penguasaan",
 ] as const;
 
-function googleModel(nama: string) {
-  return createGoogleGenerativeAI({ apiKey: geminiApiKey() })(nama);
+function googleModel(nama: string, apiKey = geminiApiKey()) {
+  return createGoogleGenerativeAI({ apiKey })(nama);
 }
 
 function bolehCubaModelLain(error: unknown) {
@@ -105,12 +105,13 @@ function bolehCubaModelLain(error: unknown) {
   );
 }
 
-async function janaObjek<T>(schema: z.ZodType<T>, prompt: string): Promise<T> {
+async function janaObjek<T>(schema: z.ZodType<T>, prompt: string, apiKey?: string): Promise<T> {
+  const kunci = apiKey || geminiApiKey();
   let last: unknown;
   for (const nama of GEMINI_MODELS) {
     try {
       const { output } = await generateText({
-        model: googleModel(nama),
+        model: googleModel(nama, kunci),
         output: Output.object({ schema }),
         prompt,
         temperature: 0.9,
@@ -242,10 +243,10 @@ type KonteksSesi = {
   masteri?: boolean;
 };
 
-function tapisSp(input: KonteksSesi) {
+function tapisSp(input: KonteksSesi, apiKey?: string) {
   const sp = input.standard_pembelajaran.filter((item) => item.pernyataan.trim());
   if (!sp.length) throw new Error("Pilih standard pembelajaran dahulu.");
-  if (!hasGeminiKey()) throw new Error("Kunci Gemini belum dikonfigurasi.");
+  if (!(apiKey || hasGeminiKey())) throw new Error("Kunci Gemini belum dikonfigurasi.");
   return sp;
 }
 
@@ -267,20 +268,21 @@ ${senaraiSp(sp)}
 ${arahanObjektifDaripadaSp()}`;
 }
 
-export async function janaObjektifSesi(input: KonteksSesi): Promise<string[]> {
-  const sp = tapisSp(input);
+export async function janaObjektifSesi(input: KonteksSesi, apiKey?: string): Promise<string[]> {
+  const sp = tapisSp(input, apiKey);
   const output = await janaObjek(
     objektifSahajaSchema,
     `${promptKonteksSesi(input, sp)}
 
-Hasilkan HANYA medan objektif. Setiap objektif mesti lahir daripada analisis SP di atas, bukan salinan ayat SP.`
+Hasilkan HANYA medan objektif. Setiap objektif mesti lahir daripada analisis SP di atas, bukan salinan ayat SP.`,
+    apiKey
   );
   if (!output?.objektif?.length) throw new Error("Gemini tidak menghasilkan objektif.");
   return output.objektif.map((item) => item.trim()).filter(Boolean).slice(0, 3);
 }
 
-export async function janaBahanSesi(input: KonteksSesi): Promise<BahanRph> {
-  const sp = tapisSp(input);
+export async function janaBahanSesi(input: KonteksSesi, apiKey?: string): Promise<BahanRph> {
+  const sp = tapisSp(input, apiKey);
   const biji = [input.mata_pelajaran, input.kelas, input.hari, input.masa, input.sk_kod, String(Date.now())].join("|");
   const masteri = Boolean(input.masteri);
   const kaedah = input.kaedah?.trim() || pilihKaedahPdP(biji, masteri);
@@ -296,7 +298,8 @@ Tugas tambahan:
 3. bbm: bahan realistik di sekolah Malaysia, sepadan dengan kaedah itu.
 4. nilai: satu nilai murni KSSM (contoh PEMIKIR, PRIHATIN, AMANAH).
 
-Jangan ulang ayat standard pembelajaran sebagai aktiviti.`
+Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
+    apiKey
   );
 
   if (!output) throw new Error("Gemini tidak menghasilkan objektif dan aktiviti.");

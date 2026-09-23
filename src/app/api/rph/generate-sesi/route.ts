@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import {
@@ -8,7 +8,7 @@ import {
   pilihAktivitiUntukSesi,
   pilihKaedahPdP,
 } from "@/lib/rph/generate";
-import { geminiApiKey } from "@/lib/runtime-env";
+import { tetapkanGeminiEnv } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +22,9 @@ export async function POST(request: Request) {
   const auth = await wajibSesi();
   if (auth.ralat) return auth.ralat;
   try {
+    await connection();
     const kunci = await kunciGemini();
-    geminiApiKey();
+    if (kunci) tetapkanGeminiEnv(kunci);
 
     const body = (await request.json().catch(() => ({}))) as {
       mata_pelajaran?: string;
@@ -99,10 +100,10 @@ export async function POST(request: Request) {
 
     try {
       if (hanyaObjektif) {
-        const objektif = await janaObjektifSesi(konteks);
+        const objektif = await janaObjektifSesi(konteks, kunci);
         return NextResponse.json({ objektif }, { headers: { "Cache-Control": "no-store" } });
       }
-      const bahan = await janaBahanSesi(konteks);
+      const bahan = await janaBahanSesi(konteks, kunci);
       return NextResponse.json(bahan, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       const mesej = error instanceof Error ? error.message : "Gemini gagal menjana kandungan RPH.";
