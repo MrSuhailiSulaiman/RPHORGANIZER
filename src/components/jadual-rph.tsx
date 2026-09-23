@@ -84,25 +84,24 @@ function KotakTanda({
   children: ReactNode;
 }) {
   return (
-    <label className={`flex items-center gap-2 ${disabled ? "" : "cursor-pointer"}`}>
-      <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
-        <input
-          type="checkbox"
-          className="peer sr-only"
-          checked={checked}
-          disabled={disabled}
-          onChange={onChange}
-          aria-label={label}
-        />
-        <span
-          className={`size-4 rounded-[2px] border border-slate-600 bg-white ${
-            checked ? "border-[#0b57d0] bg-[#0b57d0]" : ""
-          }`}
-        />
-        {checked ? <Check className="pointer-events-none absolute size-3 text-white" strokeWidth={3} /> : null}
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange()}
+      className={`flex items-center gap-2 text-left ${disabled ? "cursor-default opacity-70" : "cursor-pointer"}`}
+    >
+      <span
+        className={`inline-flex size-4 shrink-0 items-center justify-center rounded-[2px] border ${
+          checked ? "border-[#0b57d0] bg-[#0b57d0]" : "border-slate-600 bg-white"
+        }`}
+      >
+        {checked ? <Check className="size-3 text-white" strokeWidth={3} /> : null}
       </span>
       {children}
-    </label>
+    </button>
   );
 }
 
