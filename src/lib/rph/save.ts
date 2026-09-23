@@ -131,7 +131,7 @@ async function tulisBarisRph(
     .select("id")
     .maybeSingle();
   if (!error && data?.id) {
-    await tulisNilaiRefleksi([{ ...baris, id: String(data.id) }]);
+    await tulisNilaiRefleksi(supabase, [{ ...baris, id: String(data.id) }]);
     return String(data.id);
   }
 
@@ -140,7 +140,7 @@ async function tulisBarisRph(
   });
   if (rpc.error) throw error ? skemaRalat(error) : skemaRalat(rpc.error);
   const id = rpc.data ? String(rpc.data) : baris.id;
-  await tulisNilaiRefleksi([{ ...baris, id }]);
+  await tulisNilaiRefleksi(supabase, [{ ...baris, id }]);
   return id;
 }
 
@@ -420,46 +420,51 @@ async function fetchPadam(url: string, init: RequestInit, ms = 12000) {
   }
 }
 
-async function tulisNilaiRefleksi(
-  senarai: Array<
-    Pick<ReturnType<typeof barisRphDariMuatan>, "id" | "refleksi_peratus" | "refleksi_berjaya" | "refleksi_catatan">
-  >
-) {
-  const auth = kunciPadam();
-  if (!auth.url || !auth.key || !senarai.length) return;
+type BarisRefleksi = Pick<
+  ReturnType<typeof barisRphDariMuatan>,
+  "id" | "refleksi_peratus" | "refleksi_berjaya" | "refleksi_catatan"
+>;
+
+async function kemaskiniRefleksi(klien: SupabaseClient, item: BarisRefleksi) {
+  const muatan = {
+    refleksi_peratus: item.refleksi_peratus,
+    refleksi_berjaya: item.refleksi_berjaya,
+    refleksi_catatan: item.refleksi_catatan,
+  };
+  const { data, error } = await klien
+    .from("rph")
+    .update(muatan)
+    .eq("id", item.id)
+    .select("id,refleksi_berjaya")
+    .maybeSingle();
+  if (error) throw skemaRalat(error);
+
+  let disimpan = data;
+  if (!disimpan) {
+    const semak = await klien.from("rph").select("id,refleksi_berjaya").eq("id", item.id).maybeSingle();
+    if (semak.error) throw skemaRalat(semak.error);
+    disimpan = semak.data;
+  }
+  if (!disimpan) return;
+
+  if (item.refleksi_berjaya == null && disimpan.refleksi_berjaya != null) {
+    const semula = await klien
+      .from("rph")
+      .update({ refleksi_berjaya: null })
+      .eq("id", item.id)
+      .select("refleksi_berjaya")
+      .maybeSingle();
+    if (semula.error) throw skemaRalat(semula.error);
+    if (semula.data?.refleksi_berjaya != null) {
+      throw new Error("Nilai refleksi berjaya tidak dapat dikosongkan.");
+    }
+  }
+}
+
+async function tulisNilaiRefleksi(klien: SupabaseClient, senarai: BarisRefleksi[]) {
+  if (!senarai.length) return;
   for (let i = 0; i < senarai.length; i += 8) {
-    await Promise.all(
-      senarai.slice(i, i + 8).map(async (item) => {
-        const res = await fetchPadam(
-          `${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(item.id)}`,
-          {
-            method: "PATCH",
-            headers: {
-              ...kepalaPadam(auth.key, true),
-              "Content-Type": "application/json",
-              Prefer: "return=representation",
-            },
-            body: JSON.stringify({
-              refleksi_peratus: item.refleksi_peratus,
-              refleksi_berjaya: item.refleksi_berjaya,
-              refleksi_catatan: item.refleksi_catatan,
-            }),
-          }
-        );
-        if (!res?.ok) {
-          throw skemaRalat({
-            message: res ? await res.text() : "Gagal menyimpan nilai refleksi RPH.",
-          });
-        }
-        const data = (await res.json()) as Array<{ refleksi_berjaya?: boolean | null }>;
-        if (!data[0]) {
-          throw new Error("Rekod RPH tidak dijumpai semasa menyimpan refleksi.");
-        }
-        if (item.refleksi_berjaya == null && data[0].refleksi_berjaya != null) {
-          throw new Error("Nilai refleksi berjaya tidak dapat dikosongkan.");
-        }
-      })
-    );
+    await Promise.all(senarai.slice(i, i + 8).map((item) => kemaskiniRefleksi(klien, item)));
   }
 }
 
@@ -667,7 +672,7 @@ export async function simpanRphPukal(senarai: Record<string, unknown>[], penggun
         }
       }
     }
-    await tulisNilaiRefleksi(bahagian);
+    await tulisNilaiRefleksi(supabase, bahagian);
   }
   return baris.length;
 }
