@@ -127,18 +127,20 @@ async function tulisBarisRph(
 ) {
   const { data, error } = await supabase
     .from("rph")
-    .upsert(baris, { onConflict: "id", ignoreDuplicates: false, defaultToNull: false })
+    .upsert(baris, { onConflict: "id", ignoreDuplicates: false, defaultToNull: true })
     .select("id")
     .maybeSingle();
   if (!error && data?.id) {
-    await paksaTulisRefleksi([baris]);
+    await tulisNilaiRefleksi([{ ...baris, id: String(data.id) }]);
     return String(data.id);
   }
 
-  const rpc = await supabase.rpc("simpan_rph", { payload: baris });
+  const rpc = await supabase.rpc("simpan_rph", {
+    payload: { ...baris, refleksi_ditanda: baris.refleksi_berjaya != null },
+  });
   if (rpc.error) throw error ? skemaRalat(error) : skemaRalat(rpc.error);
   const id = rpc.data ? String(rpc.data) : baris.id;
-  await paksaTulisRefleksi([{ ...baris, id }]);
+  await tulisNilaiRefleksi([{ ...baris, id }]);
   return id;
 }
 
@@ -418,7 +420,7 @@ async function fetchPadam(url: string, init: RequestInit, ms = 12000) {
   }
 }
 
-async function paksaTulisRefleksi(
+async function tulisNilaiRefleksi(
   senarai: Array<
     Pick<ReturnType<typeof barisRphDariMuatan>, "id" | "refleksi_peratus" | "refleksi_berjaya" | "refleksi_catatan">
   >
@@ -427,20 +429,36 @@ async function paksaTulisRefleksi(
   if (!auth.url || !auth.key || !senarai.length) return;
   for (let i = 0; i < senarai.length; i += 8) {
     await Promise.all(
-      senarai.slice(i, i + 8).map((item) =>
-        fetchPadam(
+      senarai.slice(i, i + 8).map(async (item) => {
+        const res = await fetchPadam(
           `${auth.url}/rest/v1/rph?id=eq.${encodeURIComponent(item.id)}`,
           {
             method: "PATCH",
-            headers: { ...kepalaPadam(auth.key), "Content-Type": "application/json" },
+            headers: {
+              ...kepalaPadam(auth.key, true),
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
             body: JSON.stringify({
               refleksi_peratus: item.refleksi_peratus,
               refleksi_berjaya: item.refleksi_berjaya,
               refleksi_catatan: item.refleksi_catatan,
             }),
           }
-        )
-      )
+        );
+        if (!res?.ok) {
+          throw skemaRalat({
+            message: res ? await res.text() : "Gagal menyimpan nilai refleksi RPH.",
+          });
+        }
+        const data = (await res.json()) as Array<{ refleksi_berjaya?: boolean | null }>;
+        if (!data[0]) {
+          throw new Error("Rekod RPH tidak dijumpai semasa menyimpan refleksi.");
+        }
+        if (item.refleksi_berjaya == null && data[0].refleksi_berjaya != null) {
+          throw new Error("Nilai refleksi berjaya tidak dapat dikosongkan.");
+        }
+      })
     );
   }
 }
@@ -640,7 +658,7 @@ export async function simpanRphPukal(senarai: Record<string, unknown>[], penggun
     const bahagian = baris.slice(i, i + saiz);
     const { error } = await supabase
       .from("rph")
-      .upsert(bahagian, { onConflict: "id", ignoreDuplicates: false, defaultToNull: false });
+      .upsert(bahagian, { onConflict: "id", ignoreDuplicates: false, defaultToNull: true });
     if (error) {
       const hasil = await Promise.allSettled(bahagian.map((item) => tulisBarisRph(supabase, item)));
       for (const item of hasil) {
@@ -649,7 +667,7 @@ export async function simpanRphPukal(senarai: Record<string, unknown>[], penggun
         }
       }
     }
-    await paksaTulisRefleksi(bahagian);
+    await tulisNilaiRefleksi(bahagian);
   }
   return baris.length;
 }
