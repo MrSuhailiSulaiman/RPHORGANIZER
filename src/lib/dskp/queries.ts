@@ -1,4 +1,5 @@
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { gabungBidangSama } from "./gabung";
 import type { DokumenDskp, DokumenDskpWithTree } from "./types";
 
 export type DokumenRingkas = DokumenDskp & {
@@ -91,6 +92,7 @@ export async function getDokumen(id: string): Promise<DokumenDskpWithTree | null
 
   const dokumen = data as DokumenDskpWithTree;
   dokumen.bidang_pembelajaran.sort((a, b) => a.susunan - b.susunan);
+  dokumen.bidang_pembelajaran = gabungBidangSama(dokumen.bidang_pembelajaran);
   for (const bidang of dokumen.bidang_pembelajaran) {
     bidang.standard_kandungan.sort((a, b) => a.susunan - b.susunan);
     for (const sk of bidang.standard_kandungan) {

@@ -246,7 +246,11 @@ function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: nu
   pelukis.barisLabel(
     "STANDARD PEMBELAJARAN",
     rekod.standard_pembelajaran
-      .map((item) => `${item.kod} ${item.pernyataan}`.trim())
+      .map((item) => {
+        const ayat = `${item.kod} ${item.pernyataan}`.trim();
+        const butiran = (item.butiran ?? []).filter((baris) => baris.trim());
+        return [ayat, ...butiran.map((baris) => `    ${baris.trim()}`)].filter(Boolean).join("\n");
+      })
       .filter(Boolean)
       .join("\n") || "-"
   );

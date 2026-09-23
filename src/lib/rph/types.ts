@@ -1,6 +1,7 @@
 export type RphStandard = {
   kod: string;
   pernyataan: string;
+  butiran?: string[];
 };
 
 export type RphRekod = {
@@ -41,6 +42,7 @@ export type KurikulumPilihan = {
       standard_pembelajaran: Array<{
         kod: string;
         pernyataan: string;
+        butiran?: string[];
       }>;
     }>;
   }>;

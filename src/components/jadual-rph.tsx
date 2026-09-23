@@ -70,6 +70,18 @@ function muatKurikulum(mata: string, tingkatan: string) {
   return janji;
 }
 
+/** Butiran (i), (ii), (iii) daripada DSKP supaya Standard Pembelajaran dipapar sepenuhnya. */
+function ButiranSp({ butiran }: { butiran?: string[] }) {
+  if (!butiran?.length) return null;
+  return (
+    <ul className="mt-1 ml-1 space-y-0.5 border-l border-slate-300 pl-3 text-sm text-slate-700">
+      {butiran.map((baris, indeks) => (
+        <li key={`${indeks}-${baris.slice(0, 12)}`}>{baris}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function JadualRph({
   borang,
   onChange = () => undefined,
@@ -362,6 +374,7 @@ export function JadualRph({
                       <li key={sp.kod || `sp-${indeks}`}>
                         {sp.kod ? <span className="font-medium">{sp.kod} </span> : null}
                         {sp.pernyataan}
+                        <ButiranSp butiran={sp.butiran} />
                       </li>
                     ))}
                   </ul>
@@ -379,6 +392,7 @@ export function JadualRph({
                     />
                     <span>
                       <span className="font-medium">{sp.kod}</span> {sp.pernyataan}
+                      <ButiranSp butiran={sp.butiran} />
                     </span>
                   </label>
                 ))
@@ -391,10 +405,17 @@ export function JadualRph({
                     .join("\n")}
                   onChange={(event) =>
                     kemaskini({
-                      standard_pembelajaran: event.target.value.split("\n").map((baris) => ({
-                        kod: baris.match(/^\d+(?:\.\d+)*/)?.[0] ?? "",
-                        pernyataan: baris.replace(/^\d+(?:\.\d+)*\s*/, "").trim(),
-                      })),
+                      standard_pembelajaran: event.target.value.split("\n").map((baris) => {
+                        const kod = baris.match(/^\d+(?:\.\d+)*/)?.[0] ?? "";
+                        const pernyataan = baris.replace(/^\d+(?:\.\d+)*\s*/, "").trim();
+                        // Kekalkan butiran DSKP bagi kod yang sama.
+                        const sedia = kod
+                          ? borang.standard_pembelajaran.find((item) => item.kod === kod)
+                          : undefined;
+                        return sedia?.butiran?.length
+                          ? { kod, pernyataan, butiran: sedia.butiran }
+                          : { kod, pernyataan };
+                      }),
                     })
                   }
                 />

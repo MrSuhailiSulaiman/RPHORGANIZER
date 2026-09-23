@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { gabungBidangSama } from "@/lib/dskp/gabung";
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import type { KurikulumPilihan, RphRekod, RphStandard } from "./types";
 
@@ -25,9 +26,11 @@ function asStandards(value: unknown): RphStandard[] {
   return value.map((item) => {
     if (item && typeof item === "object") {
       const row = item as Record<string, unknown>;
+      const butiran = asStringArray(row.butiran).filter((baris) => baris.trim());
       return {
         kod: String(row.kod ?? ""),
         pernyataan: String(row.pernyataan ?? ""),
+        ...(butiran.length ? { butiran } : {}),
       };
     }
     return { kod: "", pernyataan: String(item) };
@@ -177,6 +180,7 @@ export async function getKurikulum(
           standard_pembelajaran (
             kod,
             pernyataan,
+            butiran,
             susunan
           )
         )
@@ -198,21 +202,27 @@ export async function getKurikulum(
     }) ?? data?.[0];
   if (!dokumen) return null;
 
-  const bidang = [...(dokumen.bidang_pembelajaran ?? [])]
-    .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-    .map((item) => ({
-      kod: item.kod,
-      nama: item.nama,
-      standard_kandungan: [...(item.standard_kandungan ?? [])]
-        .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-        .map((sk) => ({
-          kod: sk.kod,
-          tajuk: sk.tajuk,
-          standard_pembelajaran: [...(sk.standard_pembelajaran ?? [])]
-            .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-            .map((sp) => ({ kod: sp.kod, pernyataan: sp.pernyataan })),
-        })),
-    }));
+  const bidang = gabungBidangSama(
+    [...(dokumen.bidang_pembelajaran ?? [])]
+      .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+      .map((item) => ({
+        kod: item.kod,
+        nama: item.nama,
+        standard_kandungan: [...(item.standard_kandungan ?? [])]
+          .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+          .map((sk) => ({
+            kod: sk.kod,
+            tajuk: sk.tajuk,
+            standard_pembelajaran: [...(sk.standard_pembelajaran ?? [])]
+              .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+              .map((sp) => ({
+                kod: sp.kod,
+                pernyataan: sp.pernyataan,
+                butiran: asStringArray(sp.butiran).filter((baris) => baris.trim()),
+              })),
+          })),
+      }))
+  );
 
   return {
     dokumen_id: dokumen.id,
@@ -243,6 +253,7 @@ export async function getSemuaKurikulum(): Promise<KurikulumPilihan[]> {
           standard_pembelajaran (
             kod,
             pernyataan,
+            butiran,
             susunan
           )
         )
@@ -253,21 +264,27 @@ export async function getSemuaKurikulum(): Promise<KurikulumPilihan[]> {
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((dokumen) => {
-    const bidang = [...(dokumen.bidang_pembelajaran ?? [])]
-      .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-      .map((item) => ({
-        kod: item.kod,
-        nama: item.nama,
-        standard_kandungan: [...(item.standard_kandungan ?? [])]
-          .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-          .map((sk) => ({
-            kod: sk.kod,
-            tajuk: sk.tajuk,
-            standard_pembelajaran: [...(sk.standard_pembelajaran ?? [])]
-              .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
-              .map((sp) => ({ kod: sp.kod, pernyataan: sp.pernyataan })),
-          })),
-      }));
+    const bidang = gabungBidangSama(
+      [...(dokumen.bidang_pembelajaran ?? [])]
+        .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+        .map((item) => ({
+          kod: item.kod,
+          nama: item.nama,
+          standard_kandungan: [...(item.standard_kandungan ?? [])]
+            .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+            .map((sk) => ({
+              kod: sk.kod,
+              tajuk: sk.tajuk,
+              standard_pembelajaran: [...(sk.standard_pembelajaran ?? [])]
+                .sort((a, b) => (a.susunan ?? 0) - (b.susunan ?? 0))
+                .map((sp) => ({
+                  kod: sp.kod,
+                  pernyataan: sp.pernyataan,
+                  butiran: asStringArray(sp.butiran).filter((baris) => baris.trim()),
+                })),
+            })),
+        }))
+    );
     return {
       dokumen_id: dokumen.id,
       mata_pelajaran: dokumen.mata_pelajaran ?? "",
