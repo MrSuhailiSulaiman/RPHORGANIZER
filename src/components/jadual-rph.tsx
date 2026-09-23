@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,6 +68,42 @@ function muatKurikulum(mata: string, tingkatan: string) {
     .finally(() => inflightKurikulum.delete(kunci));
   inflightKurikulum.set(kunci, janji);
   return janji;
+}
+
+function KotakTanda({
+  checked,
+  disabled,
+  onChange,
+  label,
+  children,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={`flex items-center gap-2 ${disabled ? "" : "cursor-pointer"}`}>
+      <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange}
+          aria-label={label}
+        />
+        <span
+          className={`size-4 rounded-[2px] border border-slate-600 bg-white ${
+            checked ? "border-[#0b57d0] bg-[#0b57d0]" : ""
+          }`}
+        />
+        {checked ? <Check className="pointer-events-none absolute size-3 text-white" strokeWidth={3} /> : null}
+      </span>
+      {children}
+    </label>
+  );
 }
 
 /** Butiran (i), (ii), (iii) daripada DSKP supaya Standard Pembelajaran dipapar sepenuhnya. */
@@ -215,10 +251,6 @@ export function JadualRph({
       refleksi_berjaya: semasa === nilai ? "" : nilai,
     });
   }
-
-  const rupaKotak = bacaSahaja
-    ? "size-4 shrink-0 rounded-sm border border-slate-500 accent-[#0b57d0]"
-    : "size-4 shrink-0 cursor-pointer rounded-sm border border-slate-500 accent-[#0b57d0]";
 
   return (
     <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
@@ -530,39 +562,33 @@ export function JadualRph({
               </div>
             </td>
             <td className={cell} colSpan={4}>
-              <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
-                <input
-                  type="checkbox"
-                  className={rupaKotak}
-                  checked={borang.refleksi_berjaya === "ya"}
-                  disabled={bacaSahaja}
-                  onChange={() => pilihRefleksi("ya")}
-                  aria-label="Murid berjaya menguasai objektif pembelajaran dengan baik"
-                />
+              <KotakTanda
+                checked={borang.refleksi_berjaya === "ya"}
+                disabled={bacaSahaja}
+                onChange={() => pilihRefleksi("ya")}
+                label="Murid berjaya menguasai objektif pembelajaran dengan baik"
+              >
                 <span>
                   Murid <strong className="text-green-700">berjaya</strong> menguasai objektif pembelajaran
                   dengan baik
                 </span>
-              </label>
+              </KotakTanda>
             </td>
           </tr>
           <tr>
             <td className={cell} colSpan={1} />
             <td className={cell} colSpan={4}>
-              <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
-                <input
-                  type="checkbox"
-                  className={rupaKotak}
-                  checked={borang.refleksi_berjaya === "tidak"}
-                  disabled={bacaSahaja}
-                  onChange={() => pilihRefleksi("tidak")}
-                  aria-label="Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
-                />
+              <KotakTanda
+                checked={borang.refleksi_berjaya === "tidak"}
+                disabled={bacaSahaja}
+                onChange={() => pilihRefleksi("tidak")}
+                label="Murid tidak berjaya menguasai objektif pembelajaran dengan baik"
+              >
                 <span>
                   Murid <strong className="text-red-700">tidak berjaya</strong> menguasai objektif
                   pembelajaran dengan baik
                 </span>
-              </label>
+              </KotakTanda>
             </td>
           </tr>
           <tr>
