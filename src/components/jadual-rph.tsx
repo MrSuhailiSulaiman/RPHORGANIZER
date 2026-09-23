@@ -216,9 +216,9 @@ export function JadualRph({
     });
   }
 
-  const rupaRadio = bacaSahaja
-    ? "size-4 shrink-0 appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]"
-    : "size-4 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-500 bg-white checked:border-[#0b57d0] checked:bg-[#0b57d0] checked:shadow-[inset_0_0_0_3px_white]";
+  const rupaKotak = bacaSahaja
+    ? "size-4 shrink-0 rounded-sm border border-slate-500 accent-[#0b57d0]"
+    : "size-4 shrink-0 cursor-pointer rounded-sm border border-slate-500 accent-[#0b57d0]";
 
   return (
     <div className="overflow-x-auto rounded-sm bg-white p-2 text-slate-900 shadow-sm ring-1 ring-slate-300">
@@ -533,7 +533,7 @@ export function JadualRph({
               <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
-                  className={rupaRadio}
+                  className={rupaKotak}
                   checked={borang.refleksi_berjaya === "ya"}
                   disabled={bacaSahaja}
                   onChange={() => pilihRefleksi("ya")}
@@ -552,7 +552,7 @@ export function JadualRph({
               <label className={`flex items-center gap-2 ${bacaSahaja ? "" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
-                  className={rupaRadio}
+                  className={rupaKotak}
                   checked={borang.refleksi_berjaya === "tidak"}
                   disabled={bacaSahaja}
                   onChange={() => pilihRefleksi("tidak")}
