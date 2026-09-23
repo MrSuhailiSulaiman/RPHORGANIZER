@@ -87,6 +87,16 @@ export function PaparMingguRph() {
       });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan RPH minggu ini.");
+      const ids = borang.map((item) => item.id ?? "").filter(Boolean);
+      if (ids.length) {
+        const semak = await fetch(`/api/rph?ids=${encodeURIComponent(ids.join(","))}&t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const semakJson = await semak.json().catch(() => ({}));
+        if (semak.ok && Array.isArray(semakJson.rph)) {
+          setBorang((semakJson.rph as RphRekod[]).sort(bandingSesiRph).map(dariRekod));
+        }
+      }
       toast.success(`${json.bil ?? borang.length} RPH minggu ini disimpan.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal menyimpan RPH minggu ini.");

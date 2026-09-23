@@ -37,6 +37,27 @@ function asStandards(value: unknown): RphStandard[] {
   });
 }
 
+function teksAtauNull(value: unknown) {
+  const teks = value == null ? "" : String(value).trim();
+  return teks || null;
+}
+
+function bacaNombor(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const nombor = Number(value);
+    return Number.isFinite(nombor) ? nombor : null;
+  }
+  return null;
+}
+
+function bacaBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (value === "true" || value === "ya") return true;
+  if (value === "false" || value === "tidak") return false;
+  return null;
+}
+
 function mapRph(row: Record<string, unknown>): RphRekod {
   return {
     id: String(row.id),
@@ -56,12 +77,68 @@ function mapRph(row: Record<string, unknown>): RphRekod {
     bbm: row.bbm ? String(row.bbm) : null,
     nilai: row.nilai ? String(row.nilai) : null,
     aktiviti: asStringArray(row.aktiviti),
-    refleksi_peratus: typeof row.refleksi_peratus === "number" ? row.refleksi_peratus : null,
-    refleksi_berjaya: typeof row.refleksi_berjaya === "boolean" ? row.refleksi_berjaya : null,
+    refleksi_peratus: bacaNombor(row.refleksi_peratus),
+    refleksi_berjaya: bacaBoolean(row.refleksi_berjaya),
     refleksi_catatan: row.refleksi_catatan ? String(row.refleksi_catatan) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
+}
+
+function barisRphDariMuatan(payload: Record<string, unknown>, penggunaId: string) {
+  const id = teksAtauNull(payload.id) ?? crypto.randomUUID();
+  const peratus = bacaNombor(payload.refleksi_peratus);
+  return {
+    id,
+    sesi_id: teksAtauNull(payload.sesi_id),
+    tarikh: teksAtauNull(payload.tarikh)?.slice(0, 10) ?? null,
+    hari: teksAtauNull(payload.hari),
+    masa: teksAtauNull(payload.masa),
+    tingkatan: teksAtauNull(payload.tingkatan),
+    kelas: teksAtauNull(payload.kelas),
+    mata_pelajaran: teksAtauNull(payload.mata_pelajaran),
+    bidang_kod: teksAtauNull(payload.bidang_kod),
+    bidang_nama: teksAtauNull(payload.bidang_nama),
+    sk_kod: teksAtauNull(payload.sk_kod),
+    sk_tajuk: teksAtauNull(payload.sk_tajuk),
+    standard_pembelajaran: asStandards(payload.standard_pembelajaran),
+    objektif: asStringArray(payload.objektif),
+    bbm: teksAtauNull(payload.bbm),
+    nilai: teksAtauNull(payload.nilai),
+    aktiviti: asStringArray(payload.aktiviti),
+    refleksi_peratus: peratus == null ? null : Math.round(Math.min(100, Math.max(0, peratus))),
+    refleksi_berjaya: bacaBoolean(payload.refleksi_berjaya),
+    refleksi_catatan: teksAtauNull(payload.refleksi_catatan),
+    pengguna_id: penggunaId,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function tulisBarisRph(
+  supabase: SupabaseClient,
+  baris: ReturnType<typeof barisRphDariMuatan>
+) {
+  const { data, error } = await supabase
+    .from("rph")
+    .upsert(baris, { onConflict: "id", ignoreDuplicates: false, defaultToNull: false })
+    .select("id")
+    .maybeSingle();
+  if (!error && data?.id) return String(data.id);
+
+  const rpc = await supabase.rpc("simpan_rph", { payload: baris });
+  if (rpc.error) throw error ? skemaRalat(error) : skemaRalat(rpc.error);
+  const id = rpc.data ? String(rpc.data) : baris.id;
+  await supabase
+    .from("rph")
+    .update({
+      refleksi_peratus: baris.refleksi_peratus,
+      refleksi_berjaya: baris.refleksi_berjaya,
+      refleksi_catatan: baris.refleksi_catatan,
+      nilai: baris.nilai,
+      pengguna_id: baris.pengguna_id,
+    })
+    .eq("id", id);
+  return id;
 }
 
 const RPH_PADAM = "__DIPADAM__";
@@ -141,19 +218,14 @@ export async function getRphMengikutId(ids: string[], penggunaId: string): Promi
 
 export async function simpanRph(payload: Record<string, unknown>, penggunaId: string) {
   if (!penggunaId) throw new Error("Sila log masuk.");
-  const supabase = createAdminClient();
-  const muatan = { ...payload, pengguna_id: penggunaId };
-  const idSedia = typeof payload.id === "string" ? payload.id : "";
+  const idSedia = typeof payload.id === "string" ? payload.id.trim() : "";
   if (idSedia) {
     const sedia = await getRph(idSedia, penggunaId);
     if (!sedia) throw new Error("RPH tidak dijumpai.");
   }
-  const { data, error } = await supabase.rpc("simpan_rph", { payload: muatan });
-  if (error) throw skemaRalat(error);
-  if (data) {
-    await supabase.from("rph").update({ pengguna_id: penggunaId }).eq("id", data);
-  }
-  return { id: data as string };
+  const supabase = createAdminClient();
+  const id = await tulisBarisRph(supabase, barisRphDariMuatan(payload, penggunaId));
+  return { id };
 }
 
 export async function getKurikulum(
@@ -524,26 +596,31 @@ export async function padamSemuaRph(kunci?: KunciSupabase, penggunaId?: string) 
 export async function simpanRphPukal(senarai: Record<string, unknown>[], penggunaId: string) {
   if (!senarai.length) return 0;
   if (!penggunaId) throw new Error("Sila log masuk.");
-  const supabase = createAdminClient();
-  const muatan = senarai.map((item) => ({ ...item, pengguna_id: penggunaId }));
-  const { error } = await supabase.rpc("simpan_rph_pukal", { senarai: muatan });
-  if (!error) {
-    await supabase.from("rph").update({ pengguna_id: penggunaId }).is("pengguna_id", null);
-    return senarai.length;
+  const idsSedia = senarai
+    .map((item) => (typeof item.id === "string" ? item.id.trim() : ""))
+    .filter(Boolean);
+  if (idsSedia.length) {
+    const milik = new Set((await getRphMengikutId(idsSedia, penggunaId)).map((item) => item.id));
+    const asing = idsSedia.find((id) => !milik.has(id));
+    if (asing) throw new Error("RPH tidak dijumpai.");
   }
 
-  const saiz = 8;
-  let bil = 0;
-  for (let i = 0; i < muatan.length; i += saiz) {
-    const bahagian = muatan.slice(i, i + saiz);
-    const hasil = await Promise.allSettled(bahagian.map((item) => simpanRph(item, penggunaId)));
-    for (const item of hasil) {
-      if (item.status === "fulfilled") bil += 1;
-      else if (i === 0 && item.status === "rejected") {
-        const sebab = item.reason instanceof Error ? item.reason : skemaRalat({ message: String(item.reason) });
-        throw sebab;
+  const supabase = createAdminClient();
+  const baris = senarai.map((item) => barisRphDariMuatan(item, penggunaId));
+  const saiz = 25;
+  for (let i = 0; i < baris.length; i += saiz) {
+    const bahagian = baris.slice(i, i + saiz);
+    const { error } = await supabase
+      .from("rph")
+      .upsert(bahagian, { onConflict: "id", ignoreDuplicates: false, defaultToNull: false });
+    if (error) {
+      const hasil = await Promise.allSettled(bahagian.map((item) => tulisBarisRph(supabase, item)));
+      for (const item of hasil) {
+        if (item.status === "rejected") {
+          throw item.reason instanceof Error ? item.reason : skemaRalat({ message: String(item.reason) });
+        }
       }
     }
   }
-  return bil;
+  return baris.length;
 }

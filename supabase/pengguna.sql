@@ -175,7 +175,28 @@ $$;
 
 revoke all on function public.simpan_jadual_waktu(jsonb) from public;
 grant execute on function public.simpan_jadual_waktu(jsonb) to anon, authenticated, service_role;
+create or replace function public.simpan_rph_pukal(senarai jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item jsonb;
+  v_bil int := 0;
+begin
+  for v_item in select value from jsonb_array_elements(coalesce(senarai, '[]'::jsonb))
+  loop
+    perform public.simpan_rph(v_item);
+    v_bil := v_bil + 1;
+  end loop;
+  return v_bil;
+end;
+$$;
+
 revoke all on function public.simpan_rph(jsonb) from public;
 grant execute on function public.simpan_rph(jsonb) to anon, authenticated, service_role;
+revoke all on function public.simpan_rph_pukal(jsonb) from public;
+grant execute on function public.simpan_rph_pukal(jsonb) to anon, authenticated, service_role;
 revoke all on function public.padam_rph_pengguna(uuid) from public;
 grant execute on function public.padam_rph_pengguna(uuid) to anon, authenticated, service_role;

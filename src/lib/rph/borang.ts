@@ -79,9 +79,12 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
 }
 
 export function muatanSimpan(borang: BorangRphNilai) {
+  const peratus = Number(String(borang.refleksi_peratus ?? "").replace(/%/g, "").trim());
   return {
     ...borang,
-    refleksi_peratus: borang.refleksi_peratus ? Number(borang.refleksi_peratus) : null,
+    refleksi_peratus: Number.isFinite(peratus) ? peratus : null,
     refleksi_berjaya: borang.refleksi_berjaya === "" ? null : borang.refleksi_berjaya === "ya",
+    refleksi_catatan: borang.refleksi_catatan,
+    nilai: borang.nilai,
   };
 }
