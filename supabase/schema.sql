@@ -414,6 +414,8 @@ begin
       aktiviti = coalesce(payload->'aktiviti', aktiviti),
       refleksi_peratus = nullif(payload->>'refleksi_peratus', '')::integer,
       refleksi_berjaya = case
+        when payload ? 'refleksi_ditanda' and (payload->>'refleksi_ditanda') in ('false', 'f') then null
+        when payload->'refleksi_berjaya' = 'null'::jsonb then null
         when payload->>'refleksi_berjaya' is null then refleksi_berjaya
         else (payload->>'refleksi_berjaya')::boolean
       end,

@@ -34,6 +34,8 @@ export function BorangRph({
   const [kumpulanMinggu, setKumpulanMinggu] = useState<KumpulanMingguRph<RphRekod>[]>([]);
   const janaMasa = useRef(0);
   const janaTunda = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const borangRujukan = useRef(borang);
+  borangRujukan.current = borang;
 
   useEffect(() => {
     let hidup = true;
@@ -114,7 +116,7 @@ export function BorangRph({
       const res = await fetch("/api/rph", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(muatanSimpan(borang)),
+        body: JSON.stringify(muatanSimpan(borangRujukan.current)),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan RPH.");

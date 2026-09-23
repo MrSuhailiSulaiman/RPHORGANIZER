@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         nilai: bahan.nilai,
         aktiviti: pilihAktivitiUntukSesi(bahan, indeks, kunci),
         refleksi_peratus: PERATUS_REFLEKSI_ASAL,
-        refleksi_berjaya: true,
+        refleksi_berjaya: null,
       };
     });
 

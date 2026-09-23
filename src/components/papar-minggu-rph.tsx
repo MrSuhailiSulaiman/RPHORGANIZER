@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Loader2 } from "lucide-react";
@@ -28,6 +28,8 @@ export function PaparMingguRph() {
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangPdf, setSedangPdf] = useState(false);
+  const borangRujukan = useRef(borang);
+  borangRujukan.current = borang;
 
   useEffect(() => {
     let hidup = true;
@@ -76,18 +78,19 @@ export function PaparMingguRph() {
   }
 
   async function simpanSemua() {
-    if (!borang.length || sedangSimpan) return;
+    const senarai = borangRujukan.current;
+    if (!senarai.length || sedangSimpan) return;
     setSedangSimpan(true);
     try {
       const res = await fetch("/api/rph/pukal", {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senarai: borang.map(muatanSimpan) }),
+        body: JSON.stringify({ senarai: senarai.map(muatanSimpan) }),
       });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; bil?: number };
       if (!res.ok) throw new Error(json.ralat ?? "Gagal menyimpan RPH minggu ini.");
-      const ids = borang.map((item) => item.id ?? "").filter(Boolean);
+      const ids = senarai.map((item) => item.id ?? "").filter(Boolean);
       if (ids.length) {
         const semak = await fetch(`/api/rph?ids=${encodeURIComponent(ids.join(","))}&t=${Date.now()}`, {
           cache: "no-store",

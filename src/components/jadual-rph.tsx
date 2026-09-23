@@ -172,7 +172,9 @@ export function JadualRph({
 
   function kemaskini(patch: Partial<BorangRphNilai>) {
     if (bacaSahaja) return;
-    onChange({ ...borang, ...patch });
+    const seterusnya = { ...borangRujukan.current, ...patch };
+    borangRujukan.current = seterusnya;
+    onChange(seterusnya);
   }
 
   function pilihBidang(kod: string) {
@@ -208,8 +210,9 @@ export function JadualRph({
   }
 
   function pilihRefleksi(nilai: "ya" | "tidak") {
+    const semasa = borangRujukan.current.refleksi_berjaya;
     kemaskini({
-      refleksi_berjaya: borang.refleksi_berjaya === nilai ? "" : nilai,
+      refleksi_berjaya: semasa === nilai ? "" : nilai,
     });
   }
 
