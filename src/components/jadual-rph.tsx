@@ -554,9 +554,11 @@ export function JadualRph({
               <div className="flex items-center gap-1">
                 <Input
                   className={`${field} w-16 text-center`}
+                  inputMode="numeric"
                   value={borang.refleksi_peratus}
+                  placeholder=""
                   readOnly={bacaSahaja}
-                  onChange={(event) => kemaskini({ refleksi_peratus: event.target.value })}
+                  onChange={(event) => kemaskini({ refleksi_peratus: event.target.value.replace(/[^\d]/g, "") })}
                 />
                 <span>%</span>
               </div>

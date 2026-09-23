@@ -25,7 +25,6 @@ export type BorangRphNilai = {
 };
 
 export const NILAI_ASAL = "PEMIKIR";
-export const PERATUS_REFLEKSI_ASAL = 85;
 
 export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
   const hari = sesi?.hari ?? "ISNIN";
@@ -46,7 +45,7 @@ export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
     bbm: "",
     nilai: NILAI_ASAL,
     aktiviti: ["", "", "", "", "", ""],
-    refleksi_peratus: String(PERATUS_REFLEKSI_ASAL),
+    refleksi_peratus: "",
     refleksi_berjaya: "",
     refleksi_catatan: "",
   };
@@ -71,8 +70,7 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
     bbm: rekod.bbm ?? "",
     nilai: rekod.nilai ?? NILAI_ASAL,
     aktiviti: rekod.aktiviti.length ? rekod.aktiviti : ["", "", "", "", "", ""],
-    refleksi_peratus:
-      rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : String(PERATUS_REFLEKSI_ASAL),
+    refleksi_peratus: rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : "",
     refleksi_berjaya: rekod.refleksi_berjaya == null ? "" : rekod.refleksi_berjaya ? "ya" : "tidak",
     refleksi_catatan: rekod.refleksi_catatan ?? "",
   };
