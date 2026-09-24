@@ -165,7 +165,7 @@ function tandaKaedah(aktiviti: string[], kaedah: string) {
   return [`Kaedah ${nama}: ${pertama}`, ...lain];
 }
 
-function nomborUkuran(ayat: string) {
+function nomborUkuran(ayat: string): string[] {
   return ayat.match(/(?<![.\d])\d+(?![.\d])/g) ?? [];
 }
 
