@@ -10,7 +10,7 @@ export default function JadualWaktuPage() {
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Tetapan jadual waktu</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Jadual ini milik akaun anda. Guru lain tidak dapat melihatnya. Muat naik gambar atau PDF
-          jadual, kemudian Gemini pecahkan setiap waktu kepada sesi PdP untuk borang RPH.
+          jadual, kemudian Gemini jadikan setiap lajur kelas sebagai satu sesi PdP untuk borang RPH.
         </p>
       </div>
       <TetapanMataPelajaran />

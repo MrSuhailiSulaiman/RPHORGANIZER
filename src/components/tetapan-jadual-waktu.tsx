@@ -184,8 +184,8 @@ export function TetapanJadualWaktu() {
         <CardHeader>
           <CardTitle>Muat naik jadual waktu</CardTitle>
           <CardDescription>
-            Ambil gambar jadual guru (JPG, PNG, WEBP) atau PDF. Gemini menjana satu sesi PdP bagi
-            setiap waktu yang berisi. CSV atau Excel juga boleh.
+            Ambil gambar jadual guru (JPG, PNG, WEBP) atau PDF. Satu lajur kelas menjadi satu sesi
+            PdP, walaupun lajur itu merentas beberapa waktu. CSV atau Excel juga boleh.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

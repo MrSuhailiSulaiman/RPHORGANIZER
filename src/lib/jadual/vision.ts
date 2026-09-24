@@ -37,8 +37,8 @@ Kependekan:
 
 Peraturan:
 1. Setiap petak PdP menjadi satu objek sesi: hari, masa_mula, masa_tamat, kelas, mata_pelajaran.
-2. Satu kelas yang merentas beberapa lajur masa tetap SATU objek dengan masa mula lajur pertama hingga tamat lajur terakhir. Jangan langkau lajur. Ulang kelas yang sama pada hari atau masa lain sebagai objek berasingan.
-3. Senaraikan SEMUA petak yang berisi. Jangan berhenti separuh jadual. Bilangan objek mesti sama dengan bilangan petak PdP yang kelihatan, termasuk petak berganda seperti 13:00-14:20.
+2. Satu lajur kelas ialah SATU sesi, walaupun lajur itu merentas beberapa slot waktu. Guna masa mula slot pertama hingga tamat slot terakhir. Jangan pecahkan lajur itu kepada beberapa objek.
+3. Senaraikan SEMUA lajur kelas yang berisi. Jangan berhenti separuh jadual. Kelas yang sama pada hari atau masa lain ialah sesi berasingan. Petak berganda seperti 13:00-14:20 tetap satu objek.
 4. kelas mesti termasuk nombor tingkatan, contoh "4 UTM" bukan "UTM" sahaja.
 5. mata_pelajaran guna nama penuh, bukan kependekan.
 6. Abaikan kop sekolah, nama guru, jadual ringkasan Subjek/Kelas/Jumlah di bawah, tandatangan pengetua, motto, dan petak kosong.

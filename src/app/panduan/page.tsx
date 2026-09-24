@@ -95,8 +95,8 @@ export default function PanduanPage() {
             Langkah 2 · Muat naik jadual waktu
           </CardTitle>
           <CardDescription>
-            Jadual ini milik akaun anda. Guru lain tidak dapat melihatnya. Setiap slot menjadi sesi PdP
-            untuk Generate RPH.
+            Jadual ini milik akaun anda. Guru lain tidak dapat melihatnya. Setiap lajur kelas menjadi
+            satu sesi PdP untuk Generate RPH, walaupun lajur itu merentas beberapa waktu.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
