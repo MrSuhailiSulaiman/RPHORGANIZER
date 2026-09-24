@@ -344,10 +344,69 @@ function contentSection(text: string) {
   return section;
 }
 
+const KOD_SP_SAHAJA = /^(\d+\.\d+\.\d+)\s*$/;
+const MULA_AYAT_SP = /^(?:Men|Mem|Meng|Mel|Mer|Menc)[A-Za-zÀ-ÿ]{2,}\b/;
+const HENTI_LAJUR =
+  /^(?:Cadangan\s+Aktiviti|Tahap\s*Penguasaan|Standard\s+Prestasi|Standard\s+Kandungan|Tafsiran|Nota\s*:|KSSM\b|Glosari\b)/i;
+
+/**
+ * PDF jadual kadang-kadang mengeluarkan lajur kod dahulu, kemudian lajur ayat.
+ * "4.4.1\n4.4.2\nMenyenarai...\nMemerihal..." dijadikan "4.4.1 Menyenarai...\n4.4.2 Memerihal...".
+ */
+function gandingLajurKod(text: string) {
+  const lines = text.split(/\n/);
+  const keluar: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const kini = lines[i]?.trim() ?? "";
+    const berikut = lines[i + 1]?.trim() ?? "";
+    if (!KOD_SP_SAHAJA.test(kini) || !KOD_SP_SAHAJA.test(berikut)) {
+      keluar.push(lines[i] ?? "");
+      i += 1;
+      continue;
+    }
+
+    const kod: string[] = [];
+    while (i < lines.length && KOD_SP_SAHAJA.test(lines[i]?.trim() ?? "")) {
+      kod.push((lines[i] ?? "").trim());
+      i += 1;
+    }
+
+    const ayat: string[] = [];
+    let semasa = "";
+    const tutup = () => {
+      if (semasa.trim()) ayat.push(semasa.trim());
+      semasa = "";
+    };
+    while (i < lines.length && ayat.length < kod.length) {
+      const baris = lines[i]?.trim() ?? "";
+      if (!baris) {
+        i += 1;
+        continue;
+      }
+      if (KOD_SP_SAHAJA.test(baris) || HENTI_LAJUR.test(baris) || /^\d+\.\d+\s+\S/.test(baris)) break;
+      if (MULA_AYAT_SP.test(baris) && semasa) tutup();
+      if (ayat.length >= kod.length) break;
+      semasa = semasa ? `${semasa} ${baris}` : baris;
+      i += 1;
+      if (/[.!?]$/.test(semasa) && ayat.length + 1 >= kod.length) {
+        tutup();
+        break;
+      }
+    }
+    tutup();
+
+    const padan = Math.min(kod.length, ayat.length);
+    for (let k = 0; k < padan; k += 1) keluar.push(`${kod[k]} ${ayat[k]}`);
+    for (let k = padan; k < kod.length; k += 1) keluar.push(kod[k]);
+  }
+  return keluar.join("\n");
+}
+
 type Token = { kod: string; body: string };
 
 function tokenize(section: string): Token[] {
-  const cleaned = cleanNoise(section);
+  const cleaned = cleanNoise(gandingLajurKod(section));
   const joined = cleaned.replace(/\n+/g, " ");
   const tokens: Token[] = [];
   const matches = [...joined.matchAll(CODE_RE)];
