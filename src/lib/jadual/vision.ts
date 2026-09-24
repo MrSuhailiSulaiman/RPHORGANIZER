@@ -25,12 +25,15 @@ const ARAHAN = `Anda membaca JADUAL WAKTU GURU sekolah Malaysia (Jadual Guru Sid
 Format biasa:
 - Baris = hari (Isnin, Selasa, Rabu, Khamis, Jumaat)
 - Lajur = slot waktu (nombor 0–12) dengan masa seperti 6:30-6:40, 6:40-7:20, 8:00-8:40, 13:00-13:40
-- Petak yang ada kelas (contoh 4 UTM, 5 USM, 3 UTM) ialah sesi PdP
+- Petak yang ada kelas (contoh 4 UM, 4 UKM, 4 UUM, 5 UITM, 4 UTM, 5 USM) ialah sesi PdP
 - Di bawah nama kelas biasanya ada kependekan mata pelajaran
+- Salin kod kelas tepat seperti tertulis. UM, UKM, UUM, UITM, UTM dan USM ialah kelas berbeza. Jangan tukar UM kepada UTM.
 
 Kependekan:
 - SC KOM / SCKOM / SK = SAINS KOMPUTER
 - ASK = ASAS SAINS KOMPUTER
+- SEJ = SEJARAH
+- GEO = GEOGRAFI
 
 Peraturan:
 1. Setiap petak PdP menjadi satu objek sesi: hari, masa_mula, masa_tamat, kelas, mata_pelajaran.

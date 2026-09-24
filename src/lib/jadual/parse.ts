@@ -127,13 +127,31 @@ function pecahSlotJadual(sesi: SesiPdp): SesiPdp[] {
     dipilih.push(slot);
     akhir = minitDariMasa(slot[1]) ?? akhir;
   }
-  if (dipilih.length < 2) return [sesi];
-  return dipilih.map(([slotMula, slotTamat]) => ({
+  if (!dipilih.length) return [sesi];
+  const hasil = dipilih.map(([slotMula, slotTamat]) => ({
     ...sesi,
     masa_mula: slotMula,
     masa_tamat: slotTamat,
     masa: `${slotMula} - ${slotTamat}`,
   }));
+  const hujung = minitDariMasa(dipilih[dipilih.length - 1][1]) ?? tamat;
+  if (tamat - hujung >= 25) {
+    const mulaBaki = teksMinit(hujung);
+    const tamatBaki = teksMinit(tamat);
+    hasil.push({
+      ...sesi,
+      masa_mula: mulaBaki,
+      masa_tamat: tamatBaki,
+      masa: `${mulaBaki} - ${tamatBaki}`,
+    });
+  }
+  return hasil.length > 1 ? hasil : [sesi];
+}
+
+function teksMinit(minit: number) {
+  const jam = Math.floor(minit / 60);
+  const baki = minit % 60;
+  return `${String(jam).padStart(2, "0")}.${String(baki).padStart(2, "0")}`;
 }
 
 function hampirBersambung(tamat: string, mula: string) {

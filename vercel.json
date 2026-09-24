@@ -2,8 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "src/app/api/jadual/analyze/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{node_modules/tesseract.js/**,node_modules/tesseract.js-core/**,node_modules/wasm-feature-detect/**,vendor/tessdata/**}"
+      "maxDuration": 120
     },
     "src/app/api/dskp/analyze/route.ts": {
       "maxDuration": 60

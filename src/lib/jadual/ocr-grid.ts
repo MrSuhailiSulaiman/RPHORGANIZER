@@ -118,14 +118,7 @@ function normaliseKelasOcr(raw: string): string | null {
   token = token.replace(/^A(?=[A-Z0-9])/, "4").replace(/^S(?=U)/, "5");
   const named = token.match(/^([1-6])([A-Z]{2,})$/);
   if (named) {
-    const kod =
-      named[2] === "US" || named[2] === "UM"
-        ? named[2] === "US"
-          ? "USM"
-          : "UTM"
-        : named[2] === "UT"
-          ? "UTM"
-          : named[2];
+    const kod = named[2] === "US" ? "USM" : named[2] === "UT" ? "UTM" : named[2];
     return `${named[1]} ${kod}`;
   }
   if (/^(UTM|USM)$/.test(token)) return token;

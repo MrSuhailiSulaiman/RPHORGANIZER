@@ -67,42 +67,19 @@ export function TetapanJadualWaktu() {
     setSedangBaca(true);
     setRalatBaca("");
     const kawalan = new AbortController();
-    const timer = window.setTimeout(() => kawalan.abort(), 80000);
+    const timer = window.setTimeout(() => kawalan.abort(), 120000);
     try {
       const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
       if (heic) {
         throw new Error("Gambar iPhone (HEIC) tidak boleh dibaca. Simpan/kongsi sebagai JPG atau PNG.");
       }
 
-      const ialahGambar =
-        file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
-
-      let hasil: SesiPdp[] = [];
-      if (ialahGambar) {
-        const [{ analyzeJadualOcrPelayar }, rujukan] = await Promise.all([
-          import("@/lib/jadual/ocr-browser"),
-          fetch("/api/mata-pelajaran")
-            .then(async (res) => {
-              const json = (await res.json().catch(() => ({}))) as {
-                mata_pelajaran?: { kod?: string; nama?: string }[];
-              };
-              return (json.mata_pelajaran ?? []).flatMap((item) => {
-                const kod = item.kod?.trim() ?? "";
-                const nama = item.nama?.trim() ?? "";
-                return kod && nama ? [{ kod, nama }] : [];
-              });
-            })
-            .catch(() => []),
-        ]);
-        hasil = await analyzeJadualOcrPelayar(file, rujukan);
-      } else {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch("/api/jadual/analyze", { method: "POST", body: form, signal: kawalan.signal });
-        const json = (await res.json().catch(() => ({}))) as { ralat?: string; sesi?: SesiPdp[] };
-        if (!res.ok) throw new Error(json.ralat ?? "Gagal membaca fail.");
-        hasil = json.sesi ?? [];
-      }
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/jadual/analyze", { method: "POST", body: form, signal: kawalan.signal });
+      const json = (await res.json().catch(() => ({}))) as { ralat?: string; sesi?: SesiPdp[] };
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal membaca fail.");
+      const hasil = json.sesi ?? [];
       if (!hasil.length) {
         throw new Error("Tiada sesi PdP dijumpai dalam gambar. Pastikan jadual hari dan kelas nampak jelas.");
       }
@@ -171,9 +148,9 @@ export function TetapanJadualWaktu() {
         <CalendarClock className="size-4" />
         <AlertTitle>Jadual menjana sesi PdP</AlertTitle>
         <AlertDescription>
-          Muat naik <strong>gambar</strong> jadual guru (JPG/PNG). Sistem menganalisis setiap petak dan
-          menjana sesi PdP mengikut <strong>hari</strong>, <strong>masa</strong>, <strong>kelas</strong>,
-          dan <strong>mata pelajaran</strong>. PDF, CSV, atau Excel juga diterima.
+          Muat naik <strong>gambar</strong> atau PDF jadual guru. Gemini membaca setiap petak dan
+          menjana semua sesi PdP mengikut <strong>hari</strong>, <strong>masa</strong>, <strong>kelas</strong>,
+          dan <strong>mata pelajaran</strong>. CSV atau Excel juga diterima.
         </AlertDescription>
       </Alert>
 
@@ -181,8 +158,8 @@ export function TetapanJadualWaktu() {
         <CardHeader>
           <CardTitle>Muat naik jadual waktu</CardTitle>
           <CardDescription>
-            Ambil gambar jadual guru (JPG, PNG, WEBP). Sistem akan baca grid dan pecahkan kepada sesi
-            PdP. PDF, CSV, atau Excel juga boleh.
+            Ambil gambar jadual guru (JPG, PNG, WEBP) atau PDF. Gemini menjana satu sesi PdP bagi
+            setiap waktu yang berisi. CSV atau Excel juga boleh.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

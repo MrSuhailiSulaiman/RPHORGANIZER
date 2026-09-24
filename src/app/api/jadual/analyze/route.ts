@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { extractPdfText } from "@/lib/dskp/extract-pdf";
-import { lengkapkanSesi, parseCsv, parseJadualMatrix, parsePdfJadual } from "@/lib/jadual/parse";
+import { lengkapkanSesi, parseCsv, parseJadualMatrix } from "@/lib/jadual/parse";
 import { muatRujukanMataPelajaran } from "@/lib/jadual/rujukan";
 import {
   analyzeJadualVision,
@@ -9,11 +8,10 @@ import {
   ialahGambarJadual,
   mediaTypeJadual,
 } from "@/lib/jadual/vision";
-import { analyzeJadualOcr } from "@/lib/jadual/ocr";
 import type { SesiPdp } from "@/lib/jadual/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -54,27 +52,8 @@ export async function POST(request: Request) {
         defval: "",
       });
       sesi = parseJadualMatrix(matrix);
-    } else if (nama.endsWith(".pdf")) {
-      const extracted = await extractPdfText(bytes);
-      sesi = parseJadualMatrix(parsePdfJadual(extracted.text));
-      if (!sesi.length) {
-        if (!hasVisionProvider()) {
-          return NextResponse.json(
-            {
-              ralat:
-                "PDF ini nampak seperti imbasan. Untuk membacanya, tetapkan GOOGLE_GENERATIVE_AI_API_KEY, OPENAI_API_KEY, atau AI_GATEWAY_API_KEY.",
-            },
-            { status: 422 }
-          );
-        }
-        sesi = await analyzeJadualVision({
-          bytes,
-          mediaType: "application/pdf",
-          rujukan,
-        });
-      }
-    } else if (ialahGambarJadual(file.name, file.type)) {
-      const mime = mediaTypeJadual(file.name, file.type);
+    } else if (nama.endsWith(".pdf") || ialahGambarJadual(file.name, file.type)) {
+      const mime = nama.endsWith(".pdf") ? "application/pdf" : mediaTypeJadual(file.name, file.type);
       if (mime === "image/heic" || mime === "image/heif") {
         return NextResponse.json(
           {
@@ -84,38 +63,16 @@ export async function POST(request: Request) {
           { status: 422 }
         );
       }
-      try {
-        sesi = await analyzeJadualOcr(bytes, rujukan);
-      } catch (error) {
-        const mesej = error instanceof Error ? error.message : "Gagal membaca gambar jadual.";
-        if (!hasVisionProvider()) {
-          return NextResponse.json({ ralat: mesej }, { status: 422 });
-        }
-        try {
-          const ai = await analyzeJadualVision({ bytes, mediaType: mime, rujukan });
-          if (ai.length) sesi = ai;
-          else return NextResponse.json({ ralat: mesej }, { status: 422 });
-        } catch {
-          return NextResponse.json({ ralat: mesej }, { status: 422 });
-        }
-      }
-      if (sesi.length < 3 && hasVisionProvider()) {
-        try {
-          const ai = await analyzeJadualVision({ bytes, mediaType: mime, rujukan });
-          if (ai.length > sesi.length) sesi = ai;
-        } catch {
-          // kekalkan hasil OCR
-        }
-      }
-      if (!sesi.length) {
+      if (!hasVisionProvider()) {
         return NextResponse.json(
           {
             ralat:
-              "Gambar jadual tidak dapat dibaca. Pastikan grid hari dan waktu nampak jelas, atau muat naik PDF/CSV.",
+              "Analisis jadual memerlukan Gemini. Tetapkan GOOGLE_GENERATIVE_AI_API_KEY.",
           },
           { status: 422 }
         );
       }
+      sesi = await analyzeJadualVision({ bytes, mediaType: mime, rujukan });
     } else {
       return NextResponse.json(
         { ralat: "Gunakan gambar (JPG/PNG), PDF, CSV, atau Excel jadual waktu." },
