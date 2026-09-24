@@ -69,6 +69,7 @@ export async function POST(request: Request) {
 
     const bahanMengikutDokumen = new Map<string, Awaited<ReturnType<typeof janaBahanKurikulum>>>();
     const idDigunakan = new Set(slots.map((item) => item.dokumen_id).filter((id): id is string => Boolean(id)));
+    const hadGemini = AbortSignal.timeout(100_000);
     for (const item of kurikulum) {
       if (!idDigunakan.has(item.dokumen_id)) continue;
       const unik = new Map<string, NonNullable<(typeof slots)[number]["unit"]>>();
@@ -76,7 +77,10 @@ export async function POST(request: Request) {
         if (slot.dokumen_id !== item.dokumen_id || !slot.unit) continue;
         unik.set(kunciUnit(slot.unit), slot.unit);
       }
-      bahanMengikutDokumen.set(item.dokumen_id, await janaBahanKurikulum(item, [...unik.values()]));
+      bahanMengikutDokumen.set(
+        item.dokumen_id,
+        await janaBahanKurikulum(item, [...unik.values()], hadGemini)
+      );
     }
 
     const sandaran = bahanSandaran();

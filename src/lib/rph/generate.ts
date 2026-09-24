@@ -105,10 +105,16 @@ function bolehCubaModelLain(error: unknown) {
   );
 }
 
-async function janaObjek<T>(schema: z.ZodType<T>, prompt: string, apiKey?: string): Promise<T> {
+async function janaObjek<T>(
+  schema: z.ZodType<T>,
+  prompt: string,
+  apiKey?: string,
+  signal?: AbortSignal
+): Promise<T> {
   const kunci = apiKey || geminiApiKey();
   let last: unknown;
   for (const nama of GEMINI_MODELS) {
+    if (signal?.aborted) break;
     try {
       const { output } = await generateText({
         model: googleModel(nama, kunci),
@@ -116,6 +122,7 @@ async function janaObjek<T>(schema: z.ZodType<T>, prompt: string, apiKey?: strin
         prompt,
         temperature: 0.9,
         maxRetries: 0,
+        abortSignal: signal,
       });
       if (output) return output;
     } catch (error) {
@@ -457,7 +464,11 @@ function petaDariGemini(item: {
   };
 }
 
-export async function janaBahanKurikulum(kurikulum: KurikulumPilihan, unitTugasan?: UnitKurikulum[]) {
+export async function janaBahanKurikulum(
+  kurikulum: KurikulumPilihan,
+  unitTugasan?: UnitKurikulum[],
+  signal?: AbortSignal
+) {
   const unitList = unitTugasan?.length ? unitTugasan : [];
   const peta = new Map<string, BahanRph>();
   for (const unit of unitList) peta.set(kunciUnit(unit), bahanAsal(unit));
@@ -476,12 +487,10 @@ export async function janaBahanKurikulum(kurikulum: KurikulumPilihan, unitTugasa
   const saiz = 4;
   const bahagianSemua: typeof ringkas[] = [];
   for (let i = 0; i < ringkas.length; i += saiz) bahagianSemua.push(ringkas.slice(i, i + saiz));
-  const mula = Date.now();
-  const hadMasa = 90_000;
   let cursor = 0;
 
   async function janaBahagian() {
-    while (cursor < bahagianSemua.length && Date.now() - mula < hadMasa) {
+    while (cursor < bahagianSemua.length && !signal?.aborted) {
       const bahagian = bahagianSemua[cursor];
       cursor += 1;
       try {
@@ -511,8 +520,10 @@ ${arahanAktivitiDaripadaObjektif("kaedah berbeza bagi setiap set", false)}
 
 Jangan cipta kod baharu. Padankan sk_kod dengan tepat.
 
-${JSON.stringify(bahagian, null, 2)}`
-      );
+${JSON.stringify(bahagian, null, 2)}`,
+          undefined,
+          signal
+        );
       const kodSah = bahagian.map((item) => item.sk_kod);
       for (const item of output?.bahan ?? []) {
         const kunci = padanKunciUnit(item.sk_kod, kodSah);

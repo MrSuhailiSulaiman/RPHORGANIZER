@@ -199,7 +199,14 @@ export function SenaraiRph() {
         bil_rph?: number;
         bil_minggu?: number;
       };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana RPH.");
+      if (!res.ok) {
+        throw new Error(
+          json.ralat ??
+            (res.status === 504
+              ? "Penjanaan RPH terhenti kerana mengambil masa terlalu lama. Sila cuba lagi."
+              : "Gagal menjana RPH.")
+        );
+      }
       await muat();
       toast.success(`${json.bil_rph ?? 0} RPH dijana untuk ${json.bil_minggu ?? 40} minggu.`);
     } catch (error) {
