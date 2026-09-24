@@ -8,7 +8,7 @@ const HEADER_PATTERNS = [
   /Murid boleh\s*:/gi,
 ];
 
-const CODE_RE = /(\d+\.\d+\.\d+|\d+\.0|\d+\.\d+)/g;
+const CODE_RE = /(\d+(?:\.\d+){1,2})/g;
 
 const PENANDA_TP =
   /\b(?:TAHAP\s*PENGUASAAN|STANDARD\s+PRESTASI|TAFSIRAN|RUBRIK(?:\s+PRESTASI)?|TP\s*[1-6])\b/i;
@@ -69,24 +69,25 @@ function butiranTanpaTp(butiran: string[]) {
 }
 
 export function bersihkanExtractDskp<T extends { bidang: BidangPembelajaran[] }>(extract: T): T {
+  const bidang = extract.bidang.map((bidang) => ({
+    ...bidang,
+    nama: buangTahapPenguasaan(bidang.nama) || bidang.nama,
+    standard_kandungan: bidang.standard_kandungan.map((sk) => ({
+      ...sk,
+      tajuk: buangTahapPenguasaan(sk.tajuk) || sk.kod,
+      standard_pembelajaran: sk.standard_pembelajaran.map((sp) => {
+        const { pernyataan, butiran } = splitButiran(buangTahapPenguasaan(sp.pernyataan));
+        return {
+          ...sp,
+          pernyataan: pernyataan || compact(sp.pernyataan),
+          butiran: [...new Set(butiranTanpaTp([...butiran, ...sp.butiran]))],
+        };
+      }),
+    })),
+  }));
   return {
     ...extract,
-    bidang: extract.bidang.map((bidang) => ({
-      ...bidang,
-      nama: buangTahapPenguasaan(bidang.nama) || bidang.nama,
-      standard_kandungan: bidang.standard_kandungan.map((sk) => ({
-        ...sk,
-        tajuk: buangTahapPenguasaan(sk.tajuk) || sk.kod,
-        standard_pembelajaran: sk.standard_pembelajaran.map((sp) => {
-          const { pernyataan, butiran } = splitButiran(buangTahapPenguasaan(sp.pernyataan));
-          return {
-            ...sp,
-            pernyataan: pernyataan || compact(sp.pernyataan),
-            butiran: [...new Set(butiranTanpaTp([...butiran, ...sp.butiran]))],
-          };
-        }),
-      })),
-    })),
+    bidang: susunMengikutArasKod(bidang),
   };
 }
 
@@ -185,16 +186,143 @@ function extractPenerangan(text: string) {
   return map;
 }
 
-function isBidangKod(kod: string) {
-  return /^\d+\.0$/.test(kod);
+export function kodBersih(kod: string) {
+  return kod.trim().replace(/\s+/g, "").replace(/\.+$/g, "");
 }
 
-function isSkKod(kod: string) {
-  return /^\d+\.\d+$/.test(kod) && !isBidangKod(kod);
+/** 1.0 bidang, 1.1 standard kandungan, 1.1.1 atau 3.3.11 standard pembelajaran. */
+export function arasKod(kod: string): "bidang" | "sk" | "sp" | "" {
+  const nilai = kodBersih(kod);
+  const nombor = Number(nilai.split(".")[0]);
+  if (!Number.isInteger(nombor) || nombor < 1 || nombor > 40) return "";
+  if (/^\d+\.0$/.test(nilai)) return "bidang";
+  if (/^\d+\.\d+$/.test(nilai)) return "sk";
+  if (/^\d+\.\d+\.\d+$/.test(nilai)) return "sp";
+  return "";
 }
 
-function isSpKod(kod: string) {
-  return /^\d+\.\d+\.\d+$/.test(kod);
+function kodBidang(kod: string) {
+  return `${kodBersih(kod).split(".")[0]}.0`;
+}
+
+function kodSk(kod: string) {
+  const [pertama, kedua] = kodBersih(kod).split(".");
+  return `${pertama}.${kedua}`;
+}
+
+function bandingKod(a: string, b: string) {
+  const kiri = kodBersih(a).split(".").map((bahagian) => Number(bahagian) || 0);
+  const kanan = kodBersih(b).split(".").map((bahagian) => Number(bahagian) || 0);
+  const panjang = Math.max(kiri.length, kanan.length);
+  for (let i = 0; i < panjang; i += 1) {
+    const beza = (kiri[i] ?? 0) - (kanan[i] ?? 0);
+    if (beza) return beza;
+  }
+  return 0;
+}
+
+function tajukLemah(tajuk: string, kod: string) {
+  const nilai = tajuk.trim();
+  return !nilai || nilai === kod || nilai === "Bidang" || nilai === "Standard Kandungan";
+}
+
+/** Letak semula setiap kod pada aras nombornya, walaupun AI atau parser meletak di tempat lain. */
+export function susunMengikutArasKod(senarai: BidangPembelajaran[]): BidangPembelajaran[] {
+  const bidangPeta = new Map<string, BidangPembelajaran>();
+  const skPeta = new Map<string, StandardKandungan>();
+  const spPeta = new Map<string, StandardPembelajaran>();
+
+  function pastikanBidang(kod: string, sumber?: Partial<BidangPembelajaran>) {
+    const sedia = bidangPeta.get(kod);
+    if (sedia) {
+      if (sumber?.nama && tajukLemah(sedia.nama, kod) && !tajukLemah(sumber.nama, kod)) sedia.nama = sumber.nama;
+      if (sedia.penerangan == null && sumber?.penerangan) sedia.penerangan = sumber.penerangan;
+      if (sedia.jam == null && sumber?.jam != null) sedia.jam = sumber.jam;
+      return sedia;
+    }
+    const baru: BidangPembelajaran = {
+      kod,
+      nama: sumber?.nama && !tajukLemah(sumber.nama, kod) ? sumber.nama : `Bidang ${kod}`,
+      penerangan: sumber?.penerangan ?? null,
+      jam: sumber?.jam ?? null,
+      standard_kandungan: [],
+    };
+    bidangPeta.set(kod, baru);
+    return baru;
+  }
+
+  function pastikanSk(kod: string, sumber?: Partial<StandardKandungan>) {
+    if (arasKod(kod) !== "sk") return null;
+    const sedia = skPeta.get(kod);
+    if (sedia) {
+      if (sumber?.tajuk && tajukLemah(sedia.tajuk, kod) && !tajukLemah(sumber.tajuk, kod)) {
+        sedia.tajuk = sumber.tajuk;
+      }
+      return sedia;
+    }
+    const bidang = pastikanBidang(kodBidang(kod));
+    const baru: StandardKandungan = {
+      kod,
+      tajuk: sumber?.tajuk && !tajukLemah(sumber.tajuk, kod) ? sumber.tajuk : kod,
+      standard_pembelajaran: [],
+    };
+    skPeta.set(kod, baru);
+    bidang.standard_kandungan.push(baru);
+    return baru;
+  }
+
+  function simpanSp(sp: StandardPembelajaran) {
+    const kod = kodBersih(sp.kod);
+    if (arasKod(kod) !== "sp") return;
+    const sedia = spPeta.get(kod);
+    if (!sedia || sp.pernyataan.trim().length > sedia.pernyataan.trim().length) {
+      spPeta.set(kod, { ...sp, kod });
+    }
+  }
+
+  for (const bidang of senarai) {
+    const kodBidangItem = kodBersih(bidang.kod);
+    if (arasKod(kodBidangItem) === "bidang") pastikanBidang(kodBidangItem, bidang);
+    else if (arasKod(kodBidangItem) === "sk") pastikanSk(kodBidangItem, { tajuk: bidang.nama });
+    else if (arasKod(kodBidangItem) === "sp") {
+      simpanSp({ kod: kodBidangItem, pernyataan: bidang.nama, butiran: [] });
+    }
+
+    for (const sk of bidang.standard_kandungan) {
+      const kodSkItem = kodBersih(sk.kod);
+      if (arasKod(kodSkItem) === "sk") pastikanSk(kodSkItem, sk);
+      else if (arasKod(kodSkItem) === "bidang") pastikanBidang(kodSkItem, { nama: sk.tajuk });
+      else if (arasKod(kodSkItem) === "sp") {
+        simpanSp({ kod: kodSkItem, pernyataan: sk.tajuk, butiran: [] });
+      }
+
+      for (const sp of sk.standard_pembelajaran) {
+        const kodSp = kodBersih(sp.kod);
+        if (arasKod(kodSp) === "sp") simpanSp({ ...sp, kod: kodSp });
+        else if (arasKod(kodSp) === "sk") pastikanSk(kodSp, { tajuk: sp.pernyataan });
+        else if (arasKod(kodSp) === "bidang") pastikanBidang(kodSp, { nama: sp.pernyataan });
+      }
+    }
+  }
+
+  for (const [kod, sp] of spPeta) {
+    const sk = pastikanSk(kodSk(kod));
+    if (!sk || sk.standard_pembelajaran.some((item) => item.kod === kod)) continue;
+    sk.standard_pembelajaran.push(sp);
+  }
+
+  return [...bidangPeta.values()]
+    .map((bidang) => ({
+      ...bidang,
+      standard_kandungan: [...bidang.standard_kandungan]
+        .map((sk) => ({
+          ...sk,
+          standard_pembelajaran: [...sk.standard_pembelajaran].sort((a, b) => bandingKod(a.kod, b.kod)),
+        }))
+        .sort((a, b) => bandingKod(a.kod, b.kod)),
+    }))
+    .filter((bidang) => bidang.standard_kandungan.length || !tajukLemah(bidang.nama, bidang.kod))
+    .sort((a, b) => bandingKod(a.kod, b.kod));
 }
 
 export function teksKurikulumDskp(text: string) {
@@ -225,9 +353,8 @@ function tokenize(section: string): Token[] {
   const matches = [...joined.matchAll(CODE_RE)];
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
-    const kod = match[1];
-    if (!kod || match.index == null) continue;
-    if (!isBidangKod(kod) && !isSkKod(kod) && !isSpKod(kod)) continue;
+    const kod = kodBersih(match[1] ?? "");
+    if (!kod || match.index == null || !arasKod(kod)) continue;
     const bodyStart = match.index + match[0].length;
     const bodyEnd = matches[i + 1]?.index ?? joined.length;
     const body = joined.slice(bodyStart, bodyEnd);
@@ -247,44 +374,54 @@ export function parseDskpText(rawText: string): DskpExtract {
   let currentBidang: BidangPembelajaran | null = null;
   let currentSk: StandardKandungan | null = null;
 
+  function pastikanBidang(kod: string) {
+    const sedia = bidang.find((item) => item.kod === kod);
+    if (sedia) return sedia;
+    const baru: BidangPembelajaran = {
+      kod,
+      nama: `Bidang ${kod}`,
+      penerangan: null,
+      jam: jamByKod.get(kod) ?? null,
+      standard_kandungan: [],
+    };
+    bidang.push(baru);
+    return baru;
+  }
+
   for (const token of tokens) {
-    if (isBidangKod(token.kod)) {
+    if (arasKod(token.kod) === "bidang") {
       const nama = titleCaseNama(compact(token.body).split(/(?=\d+\.\d+)/)[0] ?? token.body);
-      currentBidang = {
-        kod: token.kod,
-        nama: nama || `Bidang ${token.kod}`,
-        penerangan: peneranganByNama.get(nama.toLowerCase()) ?? null,
-        jam: jamByKod.get(token.kod) ?? null,
-        standard_kandungan: [],
-      };
-      bidang.push(currentBidang);
+      currentBidang = pastikanBidang(token.kod);
+      if (nama) currentBidang.nama = nama;
+      currentBidang.penerangan = peneranganByNama.get(currentBidang.nama.toLowerCase()) ?? currentBidang.penerangan;
+      currentBidang.jam = jamByKod.get(token.kod) ?? currentBidang.jam;
       currentSk = null;
       continue;
     }
 
-    if (isSkKod(token.kod)) {
-      if (!currentBidang) {
-        currentBidang = {
-          kod: `${token.kod.split(".")[0]}.0`,
-          nama: "Bidang",
-          penerangan: null,
-          jam: null,
-          standard_kandungan: [],
+    if (arasKod(token.kod) === "sk") {
+      currentBidang = pastikanBidang(kodBidang(token.kod));
+      currentSk = currentBidang.standard_kandungan.find((item) => item.kod === token.kod) ?? null;
+      if (!currentSk) {
+        currentSk = {
+          kod: token.kod,
+          tajuk: compact(token.body) || token.kod,
+          standard_pembelajaran: [],
         };
-        bidang.push(currentBidang);
+        currentBidang.standard_kandungan.push(currentSk);
+      } else if (tajukLemah(currentSk.tajuk, currentSk.kod)) {
+        currentSk.tajuk = compact(token.body) || currentSk.tajuk;
       }
-      currentSk = {
-        kod: token.kod,
-        tajuk: compact(token.body) || token.kod,
-        standard_pembelajaran: [],
-      };
-      currentBidang.standard_kandungan.push(currentSk);
       continue;
     }
 
-    if (isSpKod(token.kod)) {
+    if (arasKod(token.kod) === "sp") {
+      currentBidang = pastikanBidang(kodBidang(token.kod));
+      const induk = kodSk(token.kod);
+      currentSk = currentBidang.standard_kandungan.find((item) => item.kod === induk) ?? null;
       if (!currentSk) {
-        continue;
+        currentSk = { kod: induk, tajuk: induk, standard_pembelajaran: [] };
+        currentBidang.standard_kandungan.push(currentSk);
       }
       const { pernyataan, butiran } = splitButiran(token.body);
       const sp: StandardPembelajaran = {

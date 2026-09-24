@@ -23,10 +23,12 @@ const MASA_AI_MS = 18_000;
 
 const INSTRUCTIONS = `Anda mengekstrak DSKP KSSM Malaysia.
 
-Ambil HANYA tiga bahagian ini:
-1. Bidang Pembelajaran (kod seperti 1.0) — nama bidang sahaja
-2. Standard Kandungan (kod seperti 1.1) — tajuk SK sahaja
-3. Standard Pembelajaran (kod seperti 1.1.1) — ayat kurikulum sahaja
+Kelaskan HANYA mengikut bentuk kod. Jangan ikut tajuk lajur jika nombor tidak sepadan.
+1. Bidang Pembelajaran = nombor.0 sahaja. Contoh: 1.0, 2.0, 3.0. Nama bidang sahaja.
+2. Standard Kandungan = nombor.nombor, dan nombor kedua BUKAN 0. Contoh: 1.1, 1.2, 2.1, 2.2, 2.3. Tajuk SK sahaja.
+3. Standard Pembelajaran = nombor.nombor.nombor. Contoh: 1.1.1, 1.2.3, 2.1.1, 3.3.11. Ayat kurikulum sahaja.
+Sarang mengikut awalan: 1.1 dan 1.2 di bawah 1.0; 1.1.1 di bawah 1.1; 3.3.11 di bawah 3.3, dan 3.3 di bawah 3.0.
+Jangan letak 1.1 sebagai Bidang. Jangan letak 1.0 atau 1.1.1 sebagai Standard Kandungan. Jangan letak 1.1 sebagai Standard Pembelajaran.
 
 JANGAN ambil, salin, gabung, atau simpan daripada lajur/bahagian lain:
 - Cadangan Aktiviti / Cadangan PdP / aktiviti cadangan

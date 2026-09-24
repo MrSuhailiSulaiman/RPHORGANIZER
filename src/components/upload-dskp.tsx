@@ -211,8 +211,8 @@ export function UploadDskp({ supabaseSedia }: { supabaseSedia: boolean }) {
         <CardHeader>
           <CardTitle>Muat naik DSKP</CardTitle>
           <CardDescription>
-            Isi mata pelajaran dan tingkatan dahulu. PDF kemudian disusun kepada Bidang Pembelajaran,
-            Standard Kandungan, dan Standard Pembelajaran.
+            Isi mata pelajaran dan tingkatan dahulu. PDF disusun mengikut kod: 1.0 Bidang
+            Pembelajaran, 1.1 Standard Kandungan, dan 1.1.1 atau 3.3.11 Standard Pembelajaran.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
