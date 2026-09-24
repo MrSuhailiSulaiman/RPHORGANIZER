@@ -16,6 +16,31 @@ import { cn } from "@/lib/utils";
 
 const HARI_OPTIONS = [...HARI_LIST];
 
+async function ringkaskanGambar(file: File) {
+  const gambar =
+    file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+  if (!gambar || /heic|heif/i.test(file.type) || file.size < 3_500_000) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const nisbah = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+    const lebar = Math.max(1, Math.round(bitmap.width * nisbah));
+    const tinggi = Math.max(1, Math.round(bitmap.height * nisbah));
+    const kanvas = document.createElement("canvas");
+    kanvas.width = lebar;
+    kanvas.height = tinggi;
+    const konteks = kanvas.getContext("2d");
+    if (!konteks) return file;
+    konteks.drawImage(bitmap, 0, 0, lebar, tinggi);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((selesai) => kanvas.toBlob(selesai, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    const nama = file.name.replace(/\.[^.]+$/, "") || "jadual";
+    return new File([blob], `${nama}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 function sesiKosong(): SesiPdp {
   return {
     kelas: "",
@@ -69,16 +94,17 @@ export function TetapanJadualWaktu() {
     const kawalan = new AbortController();
     const timer = window.setTimeout(() => kawalan.abort(), 120000);
     try {
-      const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
-      if (heic) {
-        throw new Error("Gambar iPhone (HEIC) tidak boleh dibaca. Simpan/kongsi sebagai JPG atau PNG.");
-      }
-
+      const dihantar = await ringkaskanGambar(file);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", dihantar);
       const res = await fetch("/api/jadual/analyze", { method: "POST", body: form, signal: kawalan.signal });
       const json = (await res.json().catch(() => ({}))) as { ralat?: string; sesi?: SesiPdp[] };
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal membaca fail.");
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error("Gambar terlalu besar. Pilih JPG atau PNG yang lebih kecil daripada 4 MB.");
+        }
+        throw new Error(json.ralat ?? "Gagal membaca jadual. Pastikan fail ialah gambar JPG, PNG, HEIC, atau PDF.");
+      }
       const hasil = json.sesi ?? [];
       if (!hasil.length) {
         throw new Error("Tiada sesi PdP dijumpai dalam gambar. Pastikan jadual hari dan kelas nampak jelas.");

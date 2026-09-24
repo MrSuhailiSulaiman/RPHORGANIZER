@@ -105,8 +105,8 @@ export default function PanduanPage() {
               Buka menu <strong className="text-foreground">Jadual waktu</strong>.
             </li>
             <li>
-              Muat naik <strong className="text-foreground">gambar jadual guru</strong> (JPG atau PNG).
-              Elakkan HEIC dari iPhone — simpan sebagai JPG dahulu. PDF, CSV, atau Excel juga diterima.
+              Muat naik <strong className="text-foreground">gambar jadual guru</strong> (JPG, PNG, atau HEIC
+              dari iPhone). PDF, CSV, atau Excel juga diterima.
             </li>
             <li>
               Sistem akan baca grid dan senaraikan sesi mengikut hari, masa, kelas, dan mata pelajaran.

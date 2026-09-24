@@ -52,15 +52,12 @@ export async function POST(request: Request) {
         defval: "",
       });
       sesi = parseJadualMatrix(matrix);
-    } else if (nama.endsWith(".pdf") || ialahGambarJadual(file.name, file.type)) {
-      const mime = nama.endsWith(".pdf") ? "application/pdf" : mediaTypeJadual(file.name, file.type);
-      if (mime === "image/heic" || mime === "image/heif") {
+    } else if (nama.endsWith(".pdf") || ialahGambarJadual(file.name, file.type, bytes) || mediaTypeJadual(file.name, file.type, bytes) === "application/pdf") {
+      const mime = mediaTypeJadual(file.name, file.type, bytes);
+      if (!mime.startsWith("image/") && mime !== "application/pdf") {
         return NextResponse.json(
-          {
-            ralat:
-              "Gambar iPhone (HEIC) tidak boleh dibaca. Buka gambar, kemudian simpan/kongsi sebagai JPG atau PNG.",
-          },
-          { status: 422 }
+          { ralat: "Gunakan gambar (JPG, PNG, WEBP, atau HEIC) atau PDF jadual waktu." },
+          { status: 400 }
         );
       }
       if (!hasVisionProvider()) {

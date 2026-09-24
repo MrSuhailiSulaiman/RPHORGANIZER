@@ -60,24 +60,45 @@ function modelVision() {
   return "google/gemini-3.6-flash";
 }
 
-export function mediaTypeJadual(nama: string, type?: string) {
-  if (type && type !== "application/octet-stream") return type;
-  const lower = nama.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".pdf")) return "application/pdf";
-  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
-  return "image/jpeg";
+function adaTanda(bytes: Uint8Array, offset: number, tanda: string) {
+  if (bytes.length < offset + tanda.length) return false;
+  for (let i = 0; i < tanda.length; i += 1) {
+    if (bytes[offset + i] !== tanda.charCodeAt(i)) return false;
+  }
+  return true;
 }
 
-export function ialahGambarJadual(nama: string, type?: string) {
+function ialahHeic(bytes: Uint8Array) {
+  if (!adaTanda(bytes, 4, "ftyp")) return false;
+  const jenama = String.fromCharCode(...bytes.slice(8, 16));
+  return /heic|heif|mif1|msf1/i.test(jenama);
+}
+
+export function mediaTypeJadual(nama: string, type?: string, bytes?: Uint8Array) {
   const lower = nama.toLowerCase();
   const mime = (type ?? "").toLowerCase();
-  return (
-    mime.startsWith("image/") ||
-    /\.(jpe?g|png|webp|gif|heic|heif)$/.test(lower)
-  );
+  if (bytes && adaTanda(bytes, 0, "%PDF")) return "application/pdf";
+  if (bytes && bytes.length > 8 && bytes[0] === 0x89 && adaTanda(bytes, 1, "PNG")) return "image/png";
+  if (bytes && adaTanda(bytes, 0, "GIF8")) return "image/gif";
+  if (bytes && adaTanda(bytes, 0, "RIFF") && adaTanda(bytes, 8, "WEBP")) return "image/webp";
+  if (bytes && bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  if ((bytes && ialahHeic(bytes)) || mime.includes("heic") || mime.includes("heif") || /\.hei[cf]$/.test(lower)) {
+    return "image/heic";
+  }
+  if (mime === "image/png" || lower.endsWith(".png")) return "image/png";
+  if (mime === "image/webp" || lower.endsWith(".webp")) return "image/webp";
+  if (mime === "image/gif" || lower.endsWith(".gif")) return "image/gif";
+  if (mime === "application/pdf" || lower.endsWith(".pdf")) return "application/pdf";
+  if (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/pjpeg" || /\.jpe?g$/.test(lower)) {
+    return "image/jpeg";
+  }
+  if (mime.startsWith("image/")) return "image/jpeg";
+  return "";
+}
+
+export function ialahGambarJadual(nama: string, type?: string, bytes?: Uint8Array) {
+  const mime = mediaTypeJadual(nama, type, bytes);
+  return mime.startsWith("image/");
 }
 
 function arahanDenganRujukan(rujukan: RujukanMataPelajaran[]) {
