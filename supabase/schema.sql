@@ -9,11 +9,18 @@ create extension if not exists "pgcrypto";
 
 create table if not exists public.mata_pelajaran (
   id uuid primary key default gen_random_uuid(),
+  kod text,
   nama text not null,
   nama_normal text generated always as (lower(btrim(nama))) stored,
   created_at timestamptz not null default now(),
   constraint mata_pelajaran_nama_normal_key unique (nama_normal)
 );
+
+alter table public.mata_pelajaran add column if not exists kod text;
+
+create unique index if not exists mata_pelajaran_kod_key
+  on public.mata_pelajaran (upper(btrim(kod)))
+  where kod is not null and btrim(kod) <> '';
 
 create table if not exists public.dokumen_dskp (
   id uuid primary key default gen_random_uuid(),

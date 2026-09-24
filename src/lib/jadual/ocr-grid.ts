@@ -1,4 +1,11 @@
-import { lengkapkanSesi, normaliseHari, sesiDariSlot, type SlotJadual } from "./parse";
+import {
+  lengkapkanSesi,
+  namaMataDariKod,
+  normaliseHari,
+  sesiDariSlot,
+  type RujukanMataPelajaran,
+  type SlotJadual,
+} from "./parse";
 import type { SesiPdp } from "./types";
 
 export type Perkataan = {
@@ -144,7 +151,7 @@ function nampakScKom(text: string) {
   );
 }
 
-function kelasRingkasan(words: Perkataan[], yMin: number) {
+function kelasRingkasan(words: Perkataan[], yMin: number, rujukan: RujukanMataPelajaran[]) {
   const bawah = words.filter((word) => word.yc > yMin);
   const hasil = new Map<string, string>();
   const baris = klusterNilai(
@@ -160,11 +167,17 @@ function kelasRingkasan(words: Perkataan[], yMin: number) {
     const kelas = token.match(/\b([1-6])\s*(USM|UTM)\b/i) ?? token.match(/\b([1-6])(USM|UTM)\b/i);
     if (!kelas) continue;
     const namaKelas = `${kelas[1]} ${kelas[2].toUpperCase()}`;
-    const mata = /asas|\bsas\b/i.test(token)
-      ? "ASAS SAINS KOMPUTER"
-      : /sains|komputer/i.test(token)
-        ? "SAINS KOMPUTER"
-        : "";
+    const daripadaKod = token
+      .split(/\s+/)
+      .map((bahagian) => namaMataDariKod(bahagian, rujukan))
+      .find(Boolean);
+    const mata =
+      daripadaKod ||
+      (/asas|\bsas\b/i.test(token)
+        ? "ASAS SAINS KOMPUTER"
+        : /sains|komputer/i.test(token)
+          ? "SAINS KOMPUTER"
+          : "");
     if (mata) hasil.set(namaKelas, mata);
   }
   return hasil;
@@ -234,7 +247,7 @@ export function perkataanDariTsv(tsv: string): Perkataan[] {
   return words;
 }
 
-export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
+export function sesiDariOcr(words: Perkataan[], rujukan: RujukanMataPelajaran[] = []): SesiPdp[] {
   const hariWords = words
     .map((word) => ({ word, hari: normaliseHariOcr(word.text) }))
     .filter((item): item is { word: Perkataan; hari: string } => Boolean(item.hari));
@@ -298,7 +311,7 @@ export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
     return { x, mula: fallback[0], tamat: fallback[1] };
   });
 
-  const ringkasan = kelasRingkasan(words, yHariMax + 40);
+  const ringkasan = kelasRingkasan(words, yHariMax + 40, rujukan);
   const namaRingkasan = [...ringkasan.keys()];
   const diletak: string[] = [];
   const slots: SlotJadual[] = [];
@@ -329,6 +342,7 @@ export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
         item.yc < word.y1 + 28 &&
         Math.abs(item.xc - word.xc) < 45
     );
+    const daripadaKod = bawah.map((item) => namaMataDariKod(item.text, rujukan)).find(Boolean);
     const petunjuk = bawah.some((item) => nampakAsk(item.text))
       ? "ASK"
       : bawah.some((item) => nampakScKom(item.text))
@@ -340,7 +354,7 @@ export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
       masa_mula: lajur.mula,
       masa_tamat: lajur.tamat,
       kelas,
-      mata_pelajaran: mataUntukKelas(kelas, ringkasan, petunjuk),
+      mata_pelajaran: daripadaKod || mataUntukKelas(kelas, ringkasan, petunjuk),
     });
   }
 
@@ -365,13 +379,16 @@ export function sesiDariOcr(words: Perkataan[]): SesiPdp[] {
   return sesiDariSlot(digabung);
 }
 
-export function sesiLengkapDariOcr(words: Perkataan[]): SesiPdp[] {
+export function sesiLengkapDariOcr(
+  words: Perkataan[],
+  rujukan: RujukanMataPelajaran[] = []
+): SesiPdp[] {
   if (!words.length) {
     throw new Error(
       "Gambar jadual tidak dapat dibaca. Cuba JPG/PNG yang terang, atau tukar HEIC kepada JPG."
     );
   }
-  const sesi = lengkapkanSesi(sesiDariOcr(words));
+  const sesi = lengkapkanSesi(sesiDariOcr(words, rujukan), rujukan);
   if (!sesi.length) {
     throw new Error(
       "Grid hari dan kelas tidak dikenali. Pastikan baris Isnin–Jumaat dan nama kelas nampak jelas."

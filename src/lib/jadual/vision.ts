@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { geminiApiKey, runtimeEnv } from "@/lib/runtime-env";
-import { sesiDariSlot } from "./parse";
+import { sesiDariSlot, type RujukanMataPelajaran } from "./parse";
 import type { SesiPdp } from "./types";
 
 const slotSchema = z.object({
@@ -76,9 +76,21 @@ export function ialahGambarJadual(nama: string, type?: string) {
   );
 }
 
+function arahanDenganRujukan(rujukan: RujukanMataPelajaran[]) {
+  const senarai = rujukan
+    .filter((item) => item.kod.trim() && item.nama.trim())
+    .map((item) => `- ${item.kod.trim().toUpperCase()} = ${item.nama.trim().toUpperCase()}`);
+  if (!senarai.length) return ARAHAN;
+  return `${ARAHAN}
+
+Kod mata pelajaran yang didaftarkan guru (guna nama penuh ini):
+${senarai.join("\n")}`;
+}
+
 export async function analyzeJadualVision(params: {
   bytes: Uint8Array;
   mediaType: string;
+  rujukan?: RujukanMataPelajaran[];
 }): Promise<SesiPdp[]> {
   if (!hasVisionProvider()) {
     throw new Error(
@@ -93,7 +105,7 @@ export async function analyzeJadualVision(params: {
       {
         role: "user",
         content: [
-          { type: "text", text: ARAHAN },
+          { type: "text", text: arahanDenganRujukan(params.rujukan ?? []) },
           {
             type: "file",
             data: params.bytes,

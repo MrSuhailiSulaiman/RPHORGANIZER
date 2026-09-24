@@ -242,3 +242,36 @@ revoke all on function public.simpan_rph_pukal(jsonb) from public;
 grant execute on function public.simpan_rph_pukal(jsonb) to anon, authenticated, service_role;
 revoke all on function public.padam_rph_pengguna(uuid) from public;
 grant execute on function public.padam_rph_pengguna(uuid) to anon, authenticated, service_role;
+
+-- Kod mata pelajaran untuk analisis jadual (contoh SK = Sains Komputer, GEO = Geografi).
+alter table public.mata_pelajaran add column if not exists kod text;
+
+create unique index if not exists mata_pelajaran_kod_key
+  on public.mata_pelajaran (upper(btrim(kod)))
+  where kod is not null and btrim(kod) <> '';
+
+update public.mata_pelajaran
+set kod = 'SK'
+where lower(btrim(nama)) = 'sains komputer'
+  and (kod is null or btrim(kod) = '');
+
+insert into public.mata_pelajaran (kod, nama)
+select 'SK', 'Sains Komputer'
+where not exists (
+  select 1 from public.mata_pelajaran
+  where lower(btrim(nama)) = 'sains komputer'
+     or upper(btrim(coalesce(kod, ''))) = 'SK'
+);
+
+update public.mata_pelajaran
+set kod = 'GEO'
+where lower(btrim(nama)) = 'geografi'
+  and (kod is null or btrim(kod) = '');
+
+insert into public.mata_pelajaran (kod, nama)
+select 'GEO', 'Geografi'
+where not exists (
+  select 1 from public.mata_pelajaran
+  where lower(btrim(nama)) = 'geografi'
+     or upper(btrim(coalesce(kod, ''))) = 'GEO'
+);

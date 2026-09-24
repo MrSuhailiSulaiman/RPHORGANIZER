@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createWorker, PSM } from "tesseract.js";
+import type { RujukanMataPelajaran } from "./parse";
 import { perkataanDariBlok, perkataanDariTsv, sesiLengkapDariOcr } from "./ocr-grid";
 import type { SesiPdp } from "./types";
 
@@ -41,7 +42,10 @@ async function denganHadMasa<T>(janji: Promise<T>, ms: number, mesej: string) {
   }
 }
 
-export async function analyzeJadualOcr(bytes: Uint8Array): Promise<SesiPdp[]> {
+export async function analyzeJadualOcr(
+  bytes: Uint8Array,
+  rujukan: RujukanMataPelajaran[] = []
+): Promise<SesiPdp[]> {
   const worker = await denganHadMasa(
     createWorker("eng", 1, pilihanPekerjaTesseract()),
     20000,
@@ -64,7 +68,7 @@ export async function analyzeJadualOcr(bytes: Uint8Array): Promise<SesiPdp[]> {
         "Gambar jadual tidak dapat dibaca. Cuba JPG/PNG yang terang, atau tukar HEIC kepada JPG."
       );
     }
-    return sesiLengkapDariOcr(words);
+    return sesiLengkapDariOcr(words, rujukan);
   } finally {
     await worker.terminate().catch(() => undefined);
   }

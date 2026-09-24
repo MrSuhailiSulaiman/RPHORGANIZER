@@ -1,8 +1,12 @@
 import { createWorker, PSM } from "tesseract.js";
 import { perkataanDariBlok, perkataanDariTsv, sesiLengkapDariOcr } from "./ocr-grid";
+import type { RujukanMataPelajaran } from "./parse";
 import type { SesiPdp } from "./types";
 
-export async function analyzeJadualOcrPelayar(file: File): Promise<SesiPdp[]> {
+export async function analyzeJadualOcrPelayar(
+  file: File,
+  rujukan: RujukanMataPelajaran[] = []
+): Promise<SesiPdp[]> {
   const worker = await createWorker("eng", 1, {
     gzip: true,
     workerBlobURL: true,
@@ -20,7 +24,7 @@ export async function analyzeJadualOcrPelayar(file: File): Promise<SesiPdp[]> {
     if (!words.length) {
       throw new Error("Gambar jadual tidak dapat dibaca. Cuba JPG/PNG yang terang.");
     }
-    return sesiLengkapDariOcr(words);
+    return sesiLengkapDariOcr(words, rujukan);
   } finally {
     await worker.terminate().catch(() => undefined);
   }

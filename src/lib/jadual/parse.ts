@@ -53,6 +53,7 @@ const MATA_PENDEK: Record<string, string> = {
   math: "MATEMATIK",
   matematik: "MATEMATIK",
   sej: "SEJARAH",
+  sk: "SAINS KOMPUTER",
   geo: "GEOGRAFI",
   muz: "PENDIDIKAN MUZIK",
   sv: "SAINS VOKASIONAL",
@@ -66,10 +67,24 @@ function kunciMata(value: string) {
     .trim();
 }
 
-export function kembangkanMataPelajaran(value: string) {
+export type RujukanMataPelajaran = { kod: string; nama: string };
+
+export function namaMataDariKod(value: string, rujukan: RujukanMataPelajaran[] = []) {
   const kunci = kunciMata(value);
   if (!kunci) return "";
-  return MATA_PENDEK[kunci] ?? value.replace(/\s+/g, " ").trim().toUpperCase();
+  const padan = rujukan.find((item) => {
+    const kod = kunciMata(item.kod);
+    const nama = kunciMata(item.nama);
+    return (kod && kod === kunci) || (nama && nama === kunci);
+  });
+  if (padan?.nama.trim()) return padan.nama.replace(/\s+/g, " ").trim().toUpperCase();
+  return MATA_PENDEK[kunci] ?? "";
+}
+
+export function kembangkanMataPelajaran(value: string, rujukan: RujukanMataPelajaran[] = []) {
+  const kunci = kunciMata(value);
+  if (!kunci) return "";
+  return namaMataDariKod(value, rujukan) || value.replace(/\s+/g, " ").trim().toUpperCase();
 }
 
 function minitDariMasa(value: string) {
@@ -345,11 +360,11 @@ function parseGrid(rows: string[][]): SesiPdp[] {
   return hasil.filter(sesiSah);
 }
 
-export function lengkapkanSesi(sesi: SesiPdp[]) {
+export function lengkapkanSesi(sesi: SesiPdp[], rujukan: RujukanMataPelajaran[] = []) {
   const mapped = sesi
     .map((item) => ({
       ...item,
-      mata_pelajaran: kembangkanMataPelajaran(item.mata_pelajaran),
+      mata_pelajaran: kembangkanMataPelajaran(item.mata_pelajaran, rujukan),
     }))
     .filter(sesiSah);
   return susunSesi(unik(cantumSesiBersambung(mapped)));

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { extractPdfText } from "@/lib/dskp/extract-pdf";
-import { parseCsv, parseJadualMatrix, parsePdfJadual, susunSesi } from "@/lib/jadual/parse";
+import { lengkapkanSesi, parseCsv, parseJadualMatrix, parsePdfJadual } from "@/lib/jadual/parse";
+import { muatRujukanMataPelajaran } from "@/lib/jadual/rujukan";
 import {
   analyzeJadualVision,
   hasVisionProvider,
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
 
     const nama = file.name.toLowerCase();
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const rujukan = await muatRujukanMataPelajaran();
     let sesi: SesiPdp[] = [];
 
     if (nama.endsWith(".csv") || nama.endsWith(".txt")) {
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
         sesi = await analyzeJadualVision({
           bytes,
           mediaType: "application/pdf",
+          rujukan,
         });
       }
     } else if (ialahGambarJadual(file.name, file.type)) {
@@ -82,14 +85,14 @@ export async function POST(request: Request) {
         );
       }
       try {
-        sesi = await analyzeJadualOcr(bytes);
+        sesi = await analyzeJadualOcr(bytes, rujukan);
       } catch (error) {
         const mesej = error instanceof Error ? error.message : "Gagal membaca gambar jadual.";
         if (!hasVisionProvider()) {
           return NextResponse.json({ ralat: mesej }, { status: 422 });
         }
         try {
-          const ai = await analyzeJadualVision({ bytes, mediaType: mime });
+          const ai = await analyzeJadualVision({ bytes, mediaType: mime, rujukan });
           if (ai.length) sesi = ai;
           else return NextResponse.json({ ralat: mesej }, { status: 422 });
         } catch {
@@ -98,7 +101,7 @@ export async function POST(request: Request) {
       }
       if (sesi.length < 3 && hasVisionProvider()) {
         try {
-          const ai = await analyzeJadualVision({ bytes, mediaType: mime });
+          const ai = await analyzeJadualVision({ bytes, mediaType: mime, rujukan });
           if (ai.length > sesi.length) sesi = ai;
         } catch {
           // kekalkan hasil OCR
@@ -120,7 +123,7 @@ export async function POST(request: Request) {
       );
     }
 
-    sesi = susunSesi(sesi);
+    sesi = lengkapkanSesi(sesi, rujukan);
     if (!sesi.length) return tiadaSesi();
 
     return NextResponse.json({ nama_fail: file.name, sesi });

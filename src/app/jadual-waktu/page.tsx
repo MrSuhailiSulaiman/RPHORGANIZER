@@ -1,4 +1,5 @@
 import { TetapanJadualWaktu } from "@/components/tetapan-jadual-waktu";
+import { TetapanMataPelajaran } from "@/components/tetapan-mata-pelajaran";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default function JadualWaktuPage() {
           kemudian sistem pecahkan setiap slot kepada sesi PdP untuk borang RPH.
         </p>
       </div>
+      <TetapanMataPelajaran />
       <TetapanJadualWaktu />
     </div>
   );

@@ -79,8 +79,22 @@ export function TetapanJadualWaktu() {
 
       let hasil: SesiPdp[] = [];
       if (ialahGambar) {
-        const { analyzeJadualOcrPelayar } = await import("@/lib/jadual/ocr-browser");
-        hasil = await analyzeJadualOcrPelayar(file);
+        const [{ analyzeJadualOcrPelayar }, rujukan] = await Promise.all([
+          import("@/lib/jadual/ocr-browser"),
+          fetch("/api/mata-pelajaran")
+            .then(async (res) => {
+              const json = (await res.json().catch(() => ({}))) as {
+                mata_pelajaran?: { kod?: string; nama?: string }[];
+              };
+              return (json.mata_pelajaran ?? []).flatMap((item) => {
+                const kod = item.kod?.trim() ?? "";
+                const nama = item.nama?.trim() ?? "";
+                return kod && nama ? [{ kod, nama }] : [];
+              });
+            })
+            .catch(() => []),
+        ]);
+        hasil = await analyzeJadualOcrPelayar(file, rujukan);
       } else {
         const form = new FormData();
         form.append("file", file);
