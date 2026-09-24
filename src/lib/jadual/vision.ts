@@ -49,15 +49,28 @@ export function hasVisionProvider() {
   return Boolean(geminiApiKey() || runtimeEnv("OPENAI_API_KEY") || runtimeEnv("AI_GATEWAY_API_KEY"));
 }
 
-function modelVision() {
+const MODEL_GAMBAR = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] as const;
+
+function modelGambar(nama: (typeof MODEL_GAMBAR)[number]) {
   const gemini = geminiApiKey();
-  if (gemini) {
-    return createGoogleGenerativeAI({ apiKey: gemini })("gemini-3.6-flash");
+  if (gemini) return createGoogleGenerativeAI({ apiKey: gemini })(nama);
+  if (runtimeEnv("OPENAI_API_KEY")) return openai("gpt-4o");
+  return `google/${nama}`;
+}
+
+function bolehCubaModelLain(error: unknown) {
+  const mesej = error instanceof Error ? error.message : String(error);
+  return /high demand|no longer available|not found|not supported|404|unavailable|quota|rate[- ]limit|429|resource exhausted|overloaded/i.test(
+    mesej
+  );
+}
+
+function ralatBacaan(error: unknown) {
+  const mesej = error instanceof Error ? error.message : "";
+  if (/high demand|unavailable|overloaded|429|quota|resource exhausted/i.test(mesej)) {
+    return new Error("Gambar JPG atau PNG diterima, tetapi Gemini sedang sibuk. Cuba muat naik semula sebentar lagi.");
   }
-  if (runtimeEnv("OPENAI_API_KEY")) {
-    return openai("gpt-4o");
-  }
-  return "google/gemini-3.6-flash";
+  return error instanceof Error ? error : new Error("Gagal membaca gambar jadual.");
 }
 
 function adaTanda(bytes: Uint8Array, offset: number, tanda: string) {
@@ -123,29 +136,34 @@ export async function analyzeJadualVision(params: {
     );
   }
 
-  const { output } = await generateText({
-    model: modelVision(),
-    temperature: 0,
-    maxOutputTokens: 16384,
-    output: Output.object({ schema: jadualSchema }),
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: arahanDenganRujukan(params.rujukan ?? []) },
+  let terakhir: unknown;
+  for (const nama of MODEL_GAMBAR) {
+    try {
+      const { output } = await generateText({
+        model: modelGambar(nama),
+        temperature: 0,
+        maxOutputTokens: 16384,
+        maxRetries: 0,
+        output: Output.object({ schema: jadualSchema }),
+        messages: [
           {
-            type: "file",
-            data: params.bytes,
-            mediaType: params.mediaType,
+            role: "user",
+            content: [
+              { type: "text", text: arahanDenganRujukan(params.rujukan ?? []) },
+              {
+                type: "file",
+                data: params.bytes,
+                mediaType: params.mediaType,
+              },
+            ],
           },
         ],
-      },
-    ],
-  });
-
-  if (!output?.sesi?.length) {
-    throw new Error("AI tidak jumpa sesi PdP dalam jadual ini.");
+      });
+      if (output?.sesi?.length) return sesiDariSlot(output.sesi);
+    } catch (error) {
+      terakhir = error;
+      if (!bolehCubaModelLain(error)) throw ralatBacaan(error);
+    }
   }
-
-  return sesiDariSlot(output.sesi);
+  throw ralatBacaan(terakhir ?? new Error("AI tidak jumpa sesi PdP dalam jadual ini."));
 }

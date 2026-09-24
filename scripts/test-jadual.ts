@@ -7,6 +7,7 @@ import {
   sesiDariSlot,
   CONTOH_CSV,
 } from "../src/lib/jadual/parse";
+import { ialahGambarJadual, mediaTypeJadual } from "../src/lib/jadual/vision";
 
 const sesi = parseJadualMatrix(parseCsv(CONTOH_CSV));
 if (sesi.length !== 4) {
@@ -90,6 +91,15 @@ if (
   daripadaGambar[1].mata_pelajaran !== "SAINS KOMPUTER"
 ) {
   throw new Error(`abbreviation expand failed ${JSON.stringify(daripadaGambar)}`);
+}
+
+const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+if (mediaTypeJadual("jadual.png", "image/png", png) !== "image/png" || !ialahGambarJadual("jadual.PNG", "", png)) {
+  throw new Error("PNG timetable was not accepted");
+}
+if (mediaTypeJadual("jadual.jpg", "image/jpeg", jpg) !== "image/jpeg" || !ialahGambarJadual("jadual.JPG", "image/jpg")) {
+  throw new Error("JPG timetable was not accepted");
 }
 
 console.log("parser ok", sesi.length, "sesi contoh,", grid.length, "sesi grid");
