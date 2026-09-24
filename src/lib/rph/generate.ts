@@ -40,7 +40,7 @@ const bahanSchema = z.object({
       objektif: z.array(ayatObjektifSesi).min(2).max(3),
       bbm: z.string(),
       nilai: z.string(),
-      set_aktiviti: z.array(setKaedahSchema).min(3).max(4),
+      set_aktiviti: z.array(setKaedahSchema).min(4).max(4),
       aktiviti_masteri: senaraiAktiviti,
     })
   ),
@@ -66,33 +66,24 @@ const GEMINI_MODELS = [
 
 export const KAEDAH_PDP = [
   {
-    nama: "Pembelajaran Koperatif (Kumpulan / Jigsaw)",
-    ciri: "murid bekerjasama dalam kumpulan kecil; setiap ahli ada peranan khusus (kumpulan asal dan kumpulan pakar) dan saling bergantung untuk matlamat bersama",
+    nama: "Pembelajaran Koperatif",
+    ciri: "murid bekerjasama dalam kumpulan kecil; setiap ahli ada peranan khusus dan saling bergantung untuk mencapai kriteria dalam objektif",
   },
   {
-    nama: "Pembelajaran Berasaskan Projek (Project-Based Learning)",
-    ciri: "murid merancang dan menyiapkan tugasan atau produk yang boleh dipamerkan, mengaplikasi pengetahuan dalam konteks sebenar, kemudian membentangkan hasil",
+    nama: "Pembelajaran Berasaskan Masalah",
+    ciri: "murid menerima satu masalah atau senario, menganalisis punca, mencadang penyelesaian, dan menilai sama ada penyelesaian itu memenuhi kriteria objektif",
   },
   {
-    nama: "Pembelajaran Inkuiri (Inquiry-Based Learning)",
-    ciri: "murid bermula dengan soalan atau masalah, membuat ramalan, meneroka dan menyiasat secara berpandu, kemudian membuat kesimpulan berdasarkan bukti",
+    nama: "Pembelajaran Inkuiri",
+    ciri: "murid bermula dengan soalan siasatan, membuat ramalan, mengumpul bukti, kemudian membuat kesimpulan yang memenuhi bilangan dalam objektif",
   },
   {
-    nama: "Kelas Terbalik (Flipped Classroom)",
-    ciri: "murid meneliti bahan (video, nota, kod QR) sebelum kelas; masa kelas digunakan untuk perbincangan, latihan aplikasi, dan menjelaskan kekeliruan",
-  },
-  {
-    nama: "Pembelajaran Kendiri (Self-Directed Learning)",
-    ciri: "murid menetapkan sasaran sendiri, memilih laluan dan kadar mengikut kebolehan, serta menilai kemajuan sendiri menggunakan rubrik atau senarai semak",
+    nama: "Pembelajaran Berasaskan Projek",
+    ciri: "murid merancang dan menyiapkan satu produk yang mempamerkan kriteria objektif, kemudian membentangkan hasil",
   },
 ] as const;
 
-export const KAEDAH_MASTERI = [
-  "kuiz masteri 5 item dan rakan semak dengan senarai semak",
-  "tugasan prestasi ringkas sebagai bukti penguasaan",
-  "exit ticket individu kemudian peta sudah kuasai / belum",
-  "demonstrasi ketua kumpulan, rakan menilai bukti penguasaan",
-] as const;
+export const KAEDAH_MASTERI = "Pembelajaran Masteri";
 
 function googleModel(nama: string, apiKey = geminiApiKey()) {
   return createGoogleGenerativeAI({ apiKey })(nama);
@@ -155,9 +146,9 @@ function bersihAktiviti(senarai: string[] | undefined) {
   return (senarai ?? []).map((item) => item.trim()).filter(Boolean).slice(0, 8);
 }
 
-/** Pilih satu kaedah PdP secara rawak tetapi stabil untuk biji yang sama. */
+/** Pilih satu kaedah PdP secara stabil untuk biji yang sama. */
 export function pilihKaedahPdP(biji: string, masteri = false) {
-  if (masteri) return KAEDAH_MASTERI[hashBiji(biji) % KAEDAH_MASTERI.length];
+  if (masteri) return KAEDAH_MASTERI;
   return KAEDAH_PDP[hashBiji(biji) % KAEDAH_PDP.length].nama;
 }
 
@@ -174,20 +165,39 @@ function tandaKaedah(aktiviti: string[], kaedah: string) {
   return [`Kaedah ${nama}: ${pertama}`, ...lain];
 }
 
+function nomborUkuran(ayat: string) {
+  return ayat.match(/(?<![.\d])\d+(?![.\d])/g) ?? [];
+}
+
+/** Pastikan sekurang-kurangnya satu langkah menyemak nombor dan kod dalam objektif. */
+export function ikatAktivitiPadaObjektif(objektif: string[], aktiviti: string[]) {
+  const langkah = bersihAktiviti(aktiviti);
+  const sasaran = objektif.map((item) => item.trim()).filter(Boolean);
+  if (!langkah.length || !sasaran.length) return langkah;
+  const nombor = [...new Set(sasaran.flatMap(nomborUkuran))];
+  const kod = [...new Set(sasaran.flatMap((ayat) => ayat.match(/\d+(?:\.\d+)+/g) ?? []))];
+  const teks = langkah.join(" ");
+  const adaNombor = !nombor.length || nombor.some((item) => nomborUkuran(teks).includes(item));
+  const adaKod = !kod.length || kod.some((item) => teks.includes(item));
+  if (adaNombor && adaKod) return langkah;
+  const semakan = sasaran[0].replace(/\s+/g, " ");
+  const penutup = `Murid menyemak hasil supaya selari dengan objektif: ${semakan}`;
+  return [...langkah.slice(0, 7), penutup];
+}
+
 /**
- * Kaedah bertukar bagi setiap kemunculan SK yang sama, dan setiap sesi ke-4 ialah semakan masteri.
- * `biji` kekal sama bagi satu kelas/SK supaya set permulaan berbeza antara kelas.
- * Langkah dalam satu set tidak dikocak kerana urutan kaedah (contoh Kelas Terbalik) mesti kekal logik.
+ * Lima kaedah dipusing secara sekata merentas RPH yang berbeza.
+ * `biji` menukar kaedah permulaan antara kelas supaya jadual tidak serupa.
  */
 export function pilihAktivitiUntukSesi(bahan: BahanRph, indeksKemunculan: number, biji: string) {
-  const masteri = bersihAktiviti(bahan.masteri);
-  if ((indeksKemunculan + 1) % 4 === 0 && masteri.length) return masteri;
-
   const amalan = (bahan.variasi?.length ? bahan.variasi : [bahan.aktiviti])
     .map(bersihAktiviti)
     .filter((item) => item.length);
-  if (!amalan.length) return bersihAktiviti(bahan.aktiviti);
-  return amalan[(indeksKemunculan + hashBiji(biji)) % amalan.length];
+  const masteri = bersihAktiviti(bahan.masteri);
+  const semua = masteri.length ? [...amalan, masteri] : amalan;
+  if (!semua.length) return ikatAktivitiPadaObjektif(bahan.objektif, bahan.aktiviti);
+  const offset = hashBiji(biji) % semua.length;
+  return ikatAktivitiPadaObjektif(bahan.objektif, semua[(indeksKemunculan + offset) % semua.length]);
 }
 
 function arahanObjektifDaripadaSp(sp?: { kod: string; pernyataan: string }[]) {
@@ -262,21 +272,28 @@ function senaraiKaedah() {
   return KAEDAH_PDP.map((item) => `- ${item.nama}: ${item.ciri}`).join("\n");
 }
 
+function arahanSelariObjektif() {
+  return `SELARI DENGAN OBJEKTIF — WAJIB:
+- Tulis objektif dahulu. Setiap langkah aktiviti melaksanakan objektif itu, bukan tugasan lain.
+- Setiap objektif mesti ada sekurang-kurangnya satu langkah yang melaksanakannya.
+- Kod SP dalam aktiviti mesti sama dengan kod dalam objektif. Jika objektif menyebut "berkaitan 3.2.1", aktiviti juga menyebut 3.2.1.
+- Nombor ukuran mesti sama. Jika objektif minta 3 contoh dan 2 justifikasi, aktiviti minta 3 contoh dan 2 justifikasi. Jangan cipta bilangan baharu.
+- Langkah semakan menyemak kriteria objektif (bilangan, masa, justifikasi) supaya guru boleh tanda ya atau tidak.
+- Dilarang kemahiran atau hasil yang tidak ditulis dalam objektif.`;
+}
+
 function arahanAktivitiDaripadaObjektif(kaedah?: string, masteri = false) {
-  const fokus = masteri
-    ? `FOKUS SESI INI: SEMAKAN MASTERI berkala (${kaedah ?? KAEDAH_MASTERI[0]}). Murid menunjukkan bukti penguasaan, bukan syarahan ulang.`
-    : `KAEDAH PEMBELAJARAN — pilih daripada senarai ini mengikut objektif yang anda tulis:
-${senaraiKaedah()}
-Cadangan kaedah untuk sesi ini: ${kaedah ?? KAEDAH_PDP[0].nama}. Jika objektif lebih sesuai dengan kaedah lain dalam senarai, gunakan kaedah itu.
-Langkah pertama WAJIB menyebut nama kaedah yang dipilih, dan semua langkah mesti mencerminkan ciri kaedah itu.`;
-  return `LANGKAH 3 — TULIS 5-8 aktiviti TERPERINCI yang BERPUSATKAN MURID, berpandukan objektif yang anda tulis.
-${fokus}
-Murid yang aktif: meneroka, menyiasat, berbincang, menyatakan contoh, menghasilkan produk, mempersembah, menilai rakan.
-Guru sebagai fasilitator, BUKAN syarahan panjang. Dilarang langkah "Guru menerangkan..." sebagai aktiviti utama.
-Setiap langkah 1-3 ayat: apa murid buat, dengan bahan apa, berapa item atau berapa minit, dan hasil yang dijangka.
-Susunan: set induksi, aktiviti utama murid, semakan pembelajaran (semak nombor dalam objektif), penutup.
-DILARANG ulang ayat, urutan, atau kaedah yang sama seperti RPH lain. Variasikan kumpulan (individu/berpasangan/4 orang), bahan, dan hasil.
-Contoh baik: "Murid dalam kumpulan pakar 4 orang menyiasat 1 senario, mencatat 3 bukti pada kertas sebak, kemudian pulang ke kumpulan asal untuk mengajar rakan dalam masa 8 minit."`;
+  const nama = masteri ? KAEDAH_MASTERI : (kaedah ?? KAEDAH_PDP[0].nama);
+  const ciri = KAEDAH_PDP.find((item) => item.nama === nama)?.ciri
+    ?? "murid membuktikan penguasaan kriteria objektif melalui kuiz, tugasan prestasi, atau semakan rakan, kemudian menanda sudah kuasai atau belum";
+  return `LANGKAH 3 — TULIS 5-8 aktiviti TERPERINCI yang BERPUSATKAN MURID.
+KAEDAH SESI INI DIKUNCI: ${nama}. Jangan tukar kaedah.
+Ciri: ${ciri}
+Langkah pertama WAJIB bermula "Kaedah ${nama}:".
+${arahanSelariObjektif()}
+Murid yang aktif. Guru sebagai fasilitator. Dilarang langkah "Guru menerangkan..." sebagai aktiviti utama.
+Setiap langkah 1-3 ayat: apa murid buat, bahan, bilangan yang sama dengan objektif, dan hasil.
+Susunan: set induksi, aktiviti utama murid, semakan objektif, penutup.`;
 }
 
 type KonteksSesi = {
@@ -357,45 +374,56 @@ Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
     objektif: pastikanKodDalamObjektif(output.objektif, sp),
     bbm: output.bbm.trim(),
     nilai: (output.nilai || "PEMIKIR").trim(),
-    aktiviti: masteri ? bersihAktiviti(output.aktiviti) : tandaKaedah(bersihAktiviti(output.aktiviti), kaedah),
+    aktiviti: ikatAktivitiPadaObjektif(
+      pastikanKodDalamObjektif(output.objektif, sp),
+      masteri ? bersihAktiviti(output.aktiviti) : tandaKaedah(bersihAktiviti(output.aktiviti), kaedah)
+    ),
   };
 }
 
-/** Bahan tanpa Gemini: tiga kaedah PdP berbeza dan satu set semakan masteri. */
+/** Bahan tanpa Gemini: empat kaedah PdP dan satu set Pembelajaran Masteri, selari dengan objektif. */
 export function bahanSandaran(tajuk?: string, kodSp?: string): BahanRph {
   const konsep = tajuk?.trim() || "isi pelajaran";
   const rujukan = kodSp?.trim() || konsep;
   const inkuiri = [
-    `Kaedah Pembelajaran Inkuiri: murid meneliti 1 senario berkaitan ${konsep} dan menulis 2 soalan siasatan pada kertas nota.`,
-    `Murid berpasangan membuat ramalan dan menyiasat 4 bukti berkaitan ${konsep} menggunakan buku teks atau bahan yang disediakan.`,
-    `Setiap pasangan mencatat 3 contoh pada kertas sebak, kemudian membanding dapatan dengan pasangan lain selama 6 minit.`,
-    `Perwakilan membentangkan 2 kesimpulan berdasarkan bukti manakala rakan menanda senarai semak.`,
-    `Murid individu menulis 3 contoh dan 2 justifikasi pada lembaran kerja tanpa merujuk nota.`,
-    `Murid menyemak nombor dalam objektif bersama rakan dan membetulkan 1 kesilapan sebelum penutup.`,
+    `Kaedah Pembelajaran Inkuiri: murid meneliti 1 senario berkaitan ${rujukan} dan menulis 2 soalan siasatan pada kertas nota.`,
+    `Murid berpasangan membuat ramalan dan menyiasat 4 bukti berkaitan ${rujukan} menggunakan buku teks atau bahan yang disediakan.`,
+    `Setiap pasangan mencatat 3 contoh berkaitan ${rujukan} pada kertas sebak, kemudian membanding dapatan dengan pasangan lain.`,
+    `Perwakilan membentangkan 2 justifikasi berdasarkan bukti manakala rakan menanda senarai semak.`,
+    `Murid individu menulis 3 contoh berkaitan ${rujukan} dan 2 justifikasi pada lembaran kerja tanpa merujuk nota.`,
+    `Murid menyemak hasil supaya selari dengan objektif: 3 contoh, 4 bukti, dan 2 justifikasi berkaitan ${rujukan}.`,
   ];
   const koperatif = [
-    `Kaedah Pembelajaran Koperatif: murid dibahagi kumpulan asal 4 orang dan setiap ahli menerima 1 peranan pakar berkaitan ${konsep}.`,
-    `Kumpulan pakar meneroka bahagian masing-masing selama 10 minit dan mencatat 3 isi penting.`,
-    `Ahli pakar pulang ke kumpulan asal dan mengajar rakan 3 isi itu, rakan mencatat 2 soalan susulan.`,
-    `Kumpulan menghasilkan 1 peta minda ${konsep} dengan 4 cabang, kemudian bertukar dengan kumpulan lain untuk 2 komen.`,
-    `Setiap murid menyelesaikan cabaran 10 minit: 3 contoh dengan 2 justifikasi bertulis secara individu.`,
-    `Kumpulan menilai sumbangan setiap ahli menggunakan senarai semak sebelum penutup.`,
+    `Kaedah Pembelajaran Koperatif: murid dibahagi kumpulan asal 4 orang dan setiap ahli menerima 1 peranan pakar berkaitan ${rujukan}.`,
+    `Kumpulan pakar meneroka bahagian masing-masing selama 10 minit dan mencatat 4 isi berkaitan ${rujukan}.`,
+    `Ahli pakar pulang ke kumpulan asal dan mengajar rakan 3 contoh berkaitan ${rujukan}, rakan mencatat 2 justifikasi.`,
+    `Kumpulan menghasilkan 1 peta minda berkaitan ${rujukan} dengan 4 cabang, kemudian bertukar dengan kumpulan lain untuk 2 komen.`,
+    `Setiap murid menulis 3 contoh berkaitan ${rujukan} dengan 2 justifikasi secara individu dalam masa 10 minit.`,
+    `Murid menyemak hasil supaya selari dengan objektif: 3 contoh, 4 isi, dan 2 justifikasi berkaitan ${rujukan}.`,
   ];
-  const kendiri = [
-    `Kaedah Pembelajaran Kendiri: murid menetapkan 1 sasaran peribadi berkaitan ${konsep} dan memilih laluan latihan mengikut kebolehan.`,
-    `Murid memilih 1 daripada 3 tugasan berbeza aras dan menyiapkannya dalam masa 12 minit.`,
-    `Murid menggunakan rubrik untuk menilai hasil sendiri dan menanda 3 kriteria yang sudah dicapai.`,
-    `Murid berpasangan bertukar hasil dan memberi 2 komen pembaikan yang khusus.`,
-    `Murid membaiki hasil berdasarkan komen rakan, kemudian menulis 2 justifikasi akhir.`,
-    `Murid mencatat 1 langkah susulan untuk sesi akan datang pada jurnal pembelajaran sebelum penutup.`,
+  const masalah = [
+    `Kaedah Pembelajaran Berasaskan Masalah: murid menerima 1 senario berkaitan ${rujukan} dan mengenal pasti 3 maklumat penting serta 2 kekangan.`,
+    `Kumpulan 4 orang menganalisis punca masalah berkaitan ${rujukan} dan mencatat 4 isi pada kertas sebak.`,
+    `Setiap kumpulan mencadang 1 penyelesaian yang mengandungi 3 contoh berkaitan ${rujukan} dengan 2 justifikasi.`,
+    `Kumpulan lain menilai cadangan itu menggunakan senarai semak 3 contoh dan 2 justifikasi, kemudian memberi 2 komen.`,
+    `Murid individu menulis semula 3 contoh berkaitan ${rujukan} dan 2 justifikasi pada lembaran kerja.`,
+    `Murid menyemak hasil supaya selari dengan objektif: 3 contoh, 4 isi, dan 2 justifikasi berkaitan ${rujukan}.`,
+  ];
+  const projek = [
+    `Kaedah Pembelajaran Berasaskan Projek: murid dalam kumpulan 4 orang merancang 1 produk berkaitan ${rujukan} yang memuatkan 4 isi utama.`,
+    `Setiap ahli menyumbang 3 contoh berkaitan ${rujukan} dan kumpulan memilih contoh yang disokong 2 justifikasi.`,
+    `Kumpulan menyiapkan produk pada kertas sebak dalam masa 10 minit dengan 4 cabang isi berkaitan ${rujukan}.`,
+    `Perwakilan membentangkan 4 isi dan 2 justifikasi berkaitan ${rujukan} manakala rakan menanda senarai semak.`,
+    `Murid individu menulis 3 contoh berkaitan ${rujukan} yang dipelajari daripada projek, dengan 2 justifikasi.`,
+    `Murid menyemak produk supaya selari dengan objektif: 3 contoh, 4 isi, dan 2 justifikasi berkaitan ${rujukan}.`,
   ];
   const masteri = [
-    `Semakan masteri: murid menanda sendiri tahap penguasaan ${konsep} (sudah kuasai / belum) pada kad exit.`,
-    `Murid individu menjawab kuiz masteri 5 item berkaitan ${konsep} dalam masa 8 minit tanpa nota.`,
-    `Rakan semak menukar kertas dan menanda 5 item menggunakan senarai semak bukti penguasaan.`,
-    `Murid yang belum kuasai mengulang 3 contoh dengan bantuan rakan, yang sudah kuasai menambah 2 senario baharu.`,
-    `Perwakilan mendemonstrasikan 1 tugasan prestasi ${konsep} selama 2 minit sebagai bukti penguasaan.`,
-    `Murid mengemaskini peta masteri (sudah/belum) dan menulis 1 langkah susulan sebelum penutup.`,
+    `Kaedah Pembelajaran Masteri: murid menanda sendiri tahap penguasaan berkaitan ${rujukan} (sudah kuasai / belum) pada kad exit.`,
+    `Murid individu menjawab kuiz masteri: 3 contoh berkaitan ${rujukan} dan 2 justifikasi dalam masa 8 minit tanpa nota.`,
+    `Rakan semak menukar kertas dan menanda 3 contoh serta 2 justifikasi menggunakan senarai semak bukti penguasaan.`,
+    `Murid yang belum kuasai mengulang 3 contoh berkaitan ${rujukan} dengan bantuan rakan, yang sudah kuasai menambah 2 senario.`,
+    `Perwakilan mendemonstrasikan 4 isi berkaitan ${rujukan} selama 2 minit sebagai bukti penguasaan.`,
+    `Murid mengemaskini peta masteri dan menyemak hasil supaya selari dengan objektif berkaitan ${rujukan}.`,
   ];
   return {
     objektif: [
@@ -404,8 +432,8 @@ export function bahanSandaran(tajuk?: string, kodSp?: string): BahanRph {
     ],
     bbm: "Buku teks, lembaran kerja, kertas sebak, pen marker, kad soalan, rubrik, projektor LCD",
     nilai: "PEMIKIR",
-    aktiviti: inkuiri,
-    variasi: [inkuiri, koperatif, kendiri],
+    aktiviti: koperatif,
+    variasi: [koperatif, masalah, inkuiri, projek],
     masteri,
   };
 }
@@ -442,6 +470,16 @@ function padanSkKod(kod: string, sah: string[]) {
   return sah.find((calon) => bersih.toLowerCase().startsWith(`${calon.toLowerCase()} `)) ?? "";
 }
 
+function kenalKaedah(teks: string) {
+  const nilai = teks.toLowerCase();
+  if (nilai.includes("koperatif")) return "Pembelajaran Koperatif";
+  if (nilai.includes("masalah")) return "Pembelajaran Berasaskan Masalah";
+  if (nilai.includes("inkuiri")) return "Pembelajaran Inkuiri";
+  if (nilai.includes("projek")) return "Pembelajaran Berasaskan Projek";
+  if (nilai.includes("masteri")) return KAEDAH_MASTERI;
+  return "";
+}
+
 function petaDariGemini(item: {
   sk_kod: string;
   objektif: string[];
@@ -449,13 +487,25 @@ function petaDariGemini(item: {
   nilai: string;
   set_aktiviti: { kaedah: string; aktiviti: string[] }[];
   aktiviti_masteri: string[];
-}): BahanRph {
-  const variasi = item.set_aktiviti
-    .map((set) => tandaKaedah(bersihAktiviti(set.aktiviti), set.kaedah ?? ""))
-    .filter((senarai) => senarai.length);
-  const masteri = bersihAktiviti(item.aktiviti_masteri);
+}, sandaran: BahanRph): BahanRph {
+  const olehNama = new Map<string, string[]>();
+  for (const set of item.set_aktiviti) {
+    const nama = kenalKaedah(set.kaedah) || kenalKaedah(set.aktiviti.join(" "));
+    const langkah = tandaKaedah(bersihAktiviti(set.aktiviti), nama || set.kaedah);
+    if (nama && langkah.length && !olehNama.has(nama)) olehNama.set(nama, langkah);
+  }
+  const objektif = item.objektif.filter(Boolean).slice(0, 3);
+  const variasi = KAEDAH_PDP.map((kaedah, indeks) =>
+    ikatAktivitiPadaObjektif(objektif, olehNama.get(kaedah.nama) ?? sandaran.variasi?.[indeks] ?? [])
+  ).filter((senarai) => senarai.length);
+  const masteri = ikatAktivitiPadaObjektif(
+    objektif,
+    tandaKaedah(bersihAktiviti(item.aktiviti_masteri), KAEDAH_MASTERI).length
+      ? tandaKaedah(bersihAktiviti(item.aktiviti_masteri), KAEDAH_MASTERI)
+      : sandaran.masteri ?? []
+  );
   return {
-    objektif: item.objektif.filter(Boolean).slice(0, 3),
+    objektif,
     bbm: item.bbm,
     nilai: item.nilai || "PEMIKIR",
     aktiviti: variasi[0] ?? [],
@@ -507,16 +557,23 @@ Objektif dan aktiviti mesti merujuk HANYA Standard Pembelajaran dalam item itu. 
 Untuk SETIAP sk_kod:
 1. ANALISIS setiap Standard Pembelajaran dalam item. Jangan salin ayat SP.
 2. objektif: 2-3 ayat TERPERINCI yang BOLEH DIUKUR. Setiap ayat satu kalimat penuh, sekurang-kurangnya 20 patah perkataan.
-3. set_aktiviti: 3 set aktiviti untuk sesi PdP yang BERBEZA. Setiap set:
-   - kaedah: pilih SATU kaedah daripada senarai kaedah di bawah yang PALING SESUAI dengan objektif. Setiap set WAJIB kaedah berbeza.
-   - aktiviti: 5-8 langkah berpusatkan murid yang benar-benar mencerminkan ciri kaedah itu.
-   Dilarang salin ayat, urutan, bahan, atau bentuk hasil merentas set.
-4. aktiviti_masteri: semakan masteri BERKALA (kuiz 5 item, exit ticket, tugasan prestasi, rakan semak bukti penguasaan).
+3. set_aktiviti: TEPAT 4 set, satu kaedah setiap set, mengikut turutan ini:
+   1) Pembelajaran Koperatif
+   2) Pembelajaran Berasaskan Masalah
+   3) Pembelajaran Inkuiri
+   4) Pembelajaran Berasaskan Projek
+   Medan kaedah mesti menyalin nama itu tepat. Setiap set 5-8 langkah yang mencerminkan ciri kaedah itu.
+   Dilarang ulang kaedah, ayat, urutan, atau bentuk hasil merentas set.
+4. aktiviti_masteri: kaedah Pembelajaran Masteri. Murid membuktikan kriteria objektif, bukan syarahan ulang.
 5. bbm dan nilai.
+
+Kaedah yang dibenarkan:
+${senaraiKaedah()}
+- ${KAEDAH_MASTERI}: murid membuktikan penguasaan kriteria objektif, kemudian menanda sudah kuasai atau belum.
 
 ${arahanObjektifDaripadaSp()}
 
-${arahanAktivitiDaripadaObjektif("kaedah berbeza bagi setiap set", false)}
+${arahanSelariObjektif()}
 
 Jangan cipta kod baharu. Padankan sk_kod dengan tepat.
 
@@ -532,7 +589,10 @@ ${JSON.stringify(bahagian, null, 2)}`,
           continue;
         }
         const unit = unitList.find((calon) => kunciUnit(calon) === kunci);
-        const bahan = petaDariGemini(item);
+        const sandaranUnit = unit
+          ? bahanAsal(unit)
+          : bahanSandaran(item.sk_kod);
+        const bahan = petaDariGemini(item, sandaranUnit);
         if (unit) bahan.objektif = pastikanKodDalamObjektif(bahan.objektif, unit.standard_pembelajaran);
         peta.set(kunci, bahan);
       }

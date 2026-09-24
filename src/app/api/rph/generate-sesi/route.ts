@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       String(body.sk_kod ?? ""),
       String(Date.now()),
     ].join("|");
-    const masteri = Date.now() % 4 === 0;
+    const masteri = Date.now() % 5 === 0;
     const hanyaObjektif = String(body.skop ?? "").trim() === "objektif";
     const konteks = {
       mata_pelajaran: String(body.mata_pelajaran ?? "").trim(),
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
             objektif: bahan.objektif,
             bbm: bahan.bbm,
             nilai: bahan.nilai,
-            aktiviti: pilihAktivitiUntukSesi(bahan, Math.floor(Math.random() * 3), biji),
+            aktiviti: pilihAktivitiUntukSesi(bahan, Math.floor(Math.random() * 5), biji),
           };
       return NextResponse.json(
         { ...isi, sandaran: true, sebab },

@@ -223,7 +223,7 @@ export function SenaraiRph() {
           <CardHeader>
             <CardTitle>Jana RPH setahun</CardTitle>
             <CardDescription>
-              Gemini membahagi setiap Standard Pembelajaran secara sekata ke semua sesi PdP, kemudian menulis objektif, BBM, nilai, dan aktiviti untuk 40 minggu persekolahan.
+              Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
@@ -265,7 +265,7 @@ export function SenaraiRph() {
         <CardHeader>
           <CardTitle>Jana RPH setahun</CardTitle>
           <CardDescription>
-            Gemini membahagi setiap Standard Pembelajaran secara sekata ke semua sesi PdP, kemudian menulis objektif, BBM, nilai, dan aktiviti untuk 40 minggu persekolahan.
+            Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">

@@ -133,8 +133,9 @@ export default function PanduanPage() {
             Langkah 3 · Generate RPH
           </CardTitle>
           <CardDescription>
-            Sistem menyusun setiap sesi PdP mengikut urutan DSKP, kemudian menulis objektif, BBM, nilai,
-            dan aktiviti untuk 40 minggu persekolahan.
+            Sistem menyusun setiap sesi PdP mengikut urutan DSKP, menulis objektif, kemudian aktiviti
+            yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah,
+            Inkuiri, Berasaskan Projek, dan Masteri.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
