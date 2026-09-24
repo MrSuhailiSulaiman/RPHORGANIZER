@@ -16,7 +16,7 @@ export type BahanRph = {
 
 const ayatObjektifSesi = z
   .string()
-  .min(130)
+  .min(80)
   .max(500)
   .refine((ayat) => (ayat.match(/\d+/g) ?? []).length >= 2, {
     message: "Objektif mesti ada sekurang-kurangnya dua nombor yang boleh diukur",
@@ -115,7 +115,7 @@ async function janaObjek<T>(schema: z.ZodType<T>, prompt: string, apiKey?: strin
         output: Output.object({ schema }),
         prompt,
         temperature: 0.9,
-        maxRetries: 1,
+        maxRetries: 0,
       });
       if (output) return output;
     } catch (error) {
@@ -473,13 +473,21 @@ export async function janaBahanKurikulum(kurikulum: KurikulumPilihan, unitTugasa
     })),
   }));
 
-  const saiz = 3;
-  for (let i = 0; i < ringkas.length; i += saiz) {
-    const bahagian = ringkas.slice(i, i + saiz);
-    try {
-      const output = await janaObjek(
-        bahanSchema,
-        `Anda guru pakar KSSM Malaysia. ANALISIS Standard Pembelajaran yang disenaraikan, kemudian tulis kandungan RPH untuk SETIAP sesi dalam bahasa Melayu standard sekolah.
+  const saiz = 4;
+  const bahagianSemua: typeof ringkas[] = [];
+  for (let i = 0; i < ringkas.length; i += saiz) bahagianSemua.push(ringkas.slice(i, i + saiz));
+  const mula = Date.now();
+  const hadMasa = 90_000;
+  let cursor = 0;
+
+  async function janaBahagian() {
+    while (cursor < bahagianSemua.length && Date.now() - mula < hadMasa) {
+      const bahagian = bahagianSemua[cursor];
+      cursor += 1;
+      try {
+        const output = await janaObjek(
+          bahanSchema,
+          `Anda guru pakar KSSM Malaysia. ANALISIS Standard Pembelajaran yang disenaraikan, kemudian tulis kandungan RPH untuk SETIAP sesi dalam bahasa Melayu standard sekolah.
 
 Mata pelajaran: ${kurikulum.mata_pelajaran}
 Tingkatan: ${kurikulum.tingkatan ?? "-"}
@@ -489,7 +497,7 @@ Objektif dan aktiviti mesti merujuk HANYA Standard Pembelajaran dalam item itu. 
 
 Untuk SETIAP sk_kod:
 1. ANALISIS setiap Standard Pembelajaran dalam item. Jangan salin ayat SP.
-2. objektif: 2-3 ayat TERPERINCI yang BOLEH DIUKUR.
+2. objektif: 2-3 ayat TERPERINCI yang BOLEH DIUKUR. Setiap ayat satu kalimat penuh, sekurang-kurangnya 20 patah perkataan.
 3. set_aktiviti: 3 set aktiviti untuk sesi PdP yang BERBEZA. Setiap set:
    - kaedah: pilih SATU kaedah daripada senarai kaedah di bawah yang PALING SESUAI dengan objektif. Setiap set WAJIB kaedah berbeza.
    - aktiviti: 5-8 langkah berpusatkan murid yang benar-benar mencerminkan ciri kaedah itu.
@@ -517,10 +525,13 @@ ${JSON.stringify(bahagian, null, 2)}`
         if (unit) bahan.objektif = pastikanKodDalamObjektif(bahan.objektif, unit.standard_pembelajaran);
         peta.set(kunci, bahan);
       }
-    } catch (error) {
-      console.error("janaBahanKurikulum", error);
+      } catch (error) {
+        console.error("janaBahanKurikulum", error);
+      }
     }
   }
+
+  await Promise.all([janaBahagian(), janaBahagian(), janaBahagian()]);
 
   return peta;
 }
