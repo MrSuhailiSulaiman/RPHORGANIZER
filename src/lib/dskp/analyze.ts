@@ -19,7 +19,7 @@ export function hasAiProvider() {
 }
 
 const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] as const;
-const MASA_AI_MS = 18_000;
+const MASA_AI_MS = 45_000;
 
 const INSTRUCTIONS = `Anda mengekstrak DSKP KSSM Malaysia.
 
@@ -94,15 +94,17 @@ function dariAi(object: DskpAiSchema): DskpExtract {
 }
 
 async function janaDskpAi(prompt: string): Promise<DskpAiSchema> {
+  const signal = AbortSignal.timeout(MASA_AI_MS);
   if (hasGoogleKey()) {
     let last: unknown;
     for (const nama of GEMINI_MODELS) {
+      if (signal.aborted) break;
       try {
         const { output } = await generateText({
           model: googleModel(nama),
           output: Output.object({ schema: dskpAiSchema }),
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(12_000),
+          abortSignal: signal,
           prompt,
         });
         if (output?.bidang?.length) return output;
@@ -120,7 +122,7 @@ async function janaDskpAi(prompt: string): Promise<DskpAiSchema> {
     model: openai("gpt-4o"),
     output: Output.object({ schema: dskpAiSchema }),
     maxRetries: 0,
-    abortSignal: AbortSignal.timeout(12_000),
+    abortSignal: AbortSignal.timeout(MASA_AI_MS),
     prompt,
   });
   if (!output?.bidang?.length) {
@@ -172,24 +174,22 @@ ${kurikulum.slice(0, 25000)}`;
   return extract;
 }
 
+function adaStandardPembelajaran(extract: DskpExtract) {
+  return extract.bidang.some((bidang) =>
+    bidang.standard_kandungan.some((sk) => sk.standard_pembelajaran.length > 0)
+  );
+}
+
 export async function analyzeDskp(params: { text: string }): Promise<DskpExtract> {
   const parsed = parseDskpText(params.text);
-  if (!hasAiProvider()) {
+  if (adaStandardPembelajaran(parsed) || !hasAiProvider()) {
     return parsed;
   }
 
   try {
-    return await Promise.race([
-      analyzeWithAi({ text: params.text, parsed }),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("timeout")), MASA_AI_MS);
-      }),
-    ]);
+    return await analyzeWithAi({ text: params.text, parsed });
   } catch (error) {
     console.error("analyzeDskp", error instanceof Error ? error.message : error);
-    return {
-      ...parsed,
-      amaran: "Analisis AI tidak lengkap untuk fail ini. Parser DSKP digunakan.",
-    };
+    return parsed;
   }
 }
