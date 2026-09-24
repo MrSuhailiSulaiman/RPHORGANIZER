@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import * as XLSX from "xlsx";
 import { lengkapkanSesi, parseCsv, parseJadualMatrix } from "@/lib/jadual/parse";
 import { muatRujukanMataPelajaran } from "@/lib/jadual/rujukan";
+import { kunciGemini } from "@/lib/rph/kunci-padam";
+import { runtimeEnv } from "@/lib/runtime-env";
 import {
   analyzeJadualVision,
-  hasVisionProvider,
   ialahGambarJadual,
   mediaTypeJadual,
 } from "@/lib/jadual/vision";
@@ -27,6 +28,8 @@ function tiadaSesi() {
 
 export async function POST(request: Request) {
   try {
+    await connection();
+    const adaGemini = Boolean((await kunciGemini()) || runtimeEnv("OPENAI_API_KEY") || runtimeEnv("AI_GATEWAY_API_KEY"));
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {
@@ -60,7 +63,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      if (!hasVisionProvider()) {
+      if (!adaGemini) {
         return NextResponse.json(
           {
             ralat:
