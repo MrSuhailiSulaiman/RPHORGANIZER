@@ -93,6 +93,49 @@ function minitDariMasa(value: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+const SLOT_JADUAL: [string, string][] = [
+  ["06.30", "06.40"],
+  ["06.40", "07.20"],
+  ["07.20", "08.00"],
+  ["08.00", "08.40"],
+  ["08.40", "09.20"],
+  ["09.00", "09.40"],
+  ["09.40", "10.20"],
+  ["10.20", "11.00"],
+  ["11.00", "11.40"],
+  ["11.40", "12.20"],
+  ["12.20", "13.00"],
+  ["13.00", "13.40"],
+  ["13.45", "14.20"],
+  ["14.20", "15.00"],
+];
+
+function pecahSlotJadual(sesi: SesiPdp): SesiPdp[] {
+  const mula = minitDariMasa(sesi.masa_mula);
+  const tamat = minitDariMasa(sesi.masa_tamat);
+  if (mula == null || tamat == null || tamat <= mula) return [sesi];
+  const calon = SLOT_JADUAL.filter((slot) => {
+    const slotMula = minitDariMasa(slot[0]);
+    const slotTamat = minitDariMasa(slot[1]);
+    return slotMula != null && slotTamat != null && slotMula >= mula - 2 && slotTamat <= tamat + 2;
+  });
+  const dipilih: [string, string][] = [];
+  let akhir = -1;
+  for (const slot of calon) {
+    const slotMula = minitDariMasa(slot[0]) ?? 0;
+    if (slotMula < akhir) continue;
+    dipilih.push(slot);
+    akhir = minitDariMasa(slot[1]) ?? akhir;
+  }
+  if (dipilih.length < 2) return [sesi];
+  return dipilih.map(([slotMula, slotTamat]) => ({
+    ...sesi,
+    masa_mula: slotMula,
+    masa_tamat: slotTamat,
+    masa: `${slotMula} - ${slotTamat}`,
+  }));
+}
+
 function hampirBersambung(tamat: string, mula: string) {
   const a = minitDariMasa(tamat);
   const b = minitDariMasa(mula);
@@ -367,7 +410,7 @@ export function lengkapkanSesi(sesi: SesiPdp[], rujukan: RujukanMataPelajaran[] 
       mata_pelajaran: kembangkanMataPelajaran(item.mata_pelajaran, rujukan),
     }))
     .filter(sesiSah);
-  return susunSesi(unik(cantumSesiBersambung(mapped)));
+  return susunSesi(unik(mapped.flatMap(pecahSlotJadual)));
 }
 
 export function parseCsv(text: string): string[][] {

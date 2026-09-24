@@ -34,12 +34,13 @@ Kependekan:
 
 Peraturan:
 1. Setiap petak PdP menjadi satu objek sesi: hari, masa_mula, masa_tamat, kelas, mata_pelajaran.
-2. Sel yang merentas dua slot (contoh nota 13:00-14:20) = SATU sesi dengan masa mula hingga tamat penuh.
-3. kelas mesti termasuk nombor tingkatan, contoh "4 UTM" bukan "UTM" sahaja.
-4. mata_pelajaran guna nama penuh, bukan kependekan.
-5. Abaikan kop sekolah, nama guru, jadual ringkasan Subjek/Kelas/Jumlah di bawah, tandatangan pengetua, motto, dan petak kosong.
-6. Jangan cipta sesi untuk rehat, perhimpunan, atau petak kosong.
-7. masa_mula dan masa_tamat format HH.MM (contoh 06.40, 13.00, 14.20).`;
+2. Satu kelas yang merentas beberapa lajur masa tetap SATU objek dengan masa mula lajur pertama hingga tamat lajur terakhir. Jangan langkau lajur. Ulang kelas yang sama pada hari atau masa lain sebagai objek berasingan.
+3. Senaraikan SEMUA petak yang berisi. Jangan berhenti separuh jadual. Bilangan objek mesti sama dengan bilangan petak PdP yang kelihatan, termasuk petak berganda seperti 13:00-14:20.
+4. kelas mesti termasuk nombor tingkatan, contoh "4 UTM" bukan "UTM" sahaja.
+5. mata_pelajaran guna nama penuh, bukan kependekan.
+6. Abaikan kop sekolah, nama guru, jadual ringkasan Subjek/Kelas/Jumlah di bawah, tandatangan pengetua, motto, dan petak kosong.
+7. Jangan cipta sesi untuk rehat, perhimpunan, atau petak kosong.
+8. masa_mula dan masa_tamat format HH.MM (contoh 06.40, 13.00, 14.20).`;
 
 export function hasVisionProvider() {
   return Boolean(geminiApiKey() || runtimeEnv("OPENAI_API_KEY") || runtimeEnv("AI_GATEWAY_API_KEY"));
@@ -100,6 +101,8 @@ export async function analyzeJadualVision(params: {
 
   const { output } = await generateText({
     model: modelVision(),
+    temperature: 0,
+    maxOutputTokens: 16384,
     output: Output.object({ schema: jadualSchema }),
     messages: [
       {
