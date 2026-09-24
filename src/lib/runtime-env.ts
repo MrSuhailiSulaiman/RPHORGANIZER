@@ -80,12 +80,19 @@ export function kunciSupabase() {
     nilaiEnv("NEXT_PUBLIC_SUPABASE_URL") ||
     nilaiEnv("SUPABASE_URL");
   const service =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || nilaiEnv("SUPABASE_SERVICE_ROLE_KEY");
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    nilaiEnv("SUPABASE_SERVICE_ROLE_KEY") ||
+    nilaiEnv("SUPABASE_SECRET_KEY");
   const anon =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
     process.env.SUPABASE_ANON_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
     nilaiEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
-    nilaiEnv("SUPABASE_ANON_KEY");
+    nilaiEnv("SUPABASE_ANON_KEY") ||
+    nilaiEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
+    nilaiEnv("SUPABASE_PUBLISHABLE_KEY");
   return { url, service, anon, key: service || anon };
 }
 
