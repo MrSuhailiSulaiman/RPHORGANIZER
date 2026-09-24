@@ -1,4 +1,4 @@
-import type { RphRekod, RphStandard } from "./types";
+import { bacaStatusRefleksi, STATUS_REFLEKSI_ASAL, type RphRekod, type RphStandard } from "./types";
 import type { SesiPdp } from "@/lib/jadual/types";
 
 export type BorangRphNilai = {
@@ -20,7 +20,7 @@ export type BorangRphNilai = {
   nilai: string;
   aktiviti: string[];
   refleksi_peratus: string;
-  refleksi_berjaya: "" | "ya" | "tidak";
+  refleksi_berjaya: string;
   refleksi_catatan: string;
 };
 
@@ -46,7 +46,7 @@ export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
     nilai: NILAI_ASAL,
     aktiviti: ["", "", "", "", "", ""],
     refleksi_peratus: "",
-    refleksi_berjaya: "",
+    refleksi_berjaya: STATUS_REFLEKSI_ASAL,
     refleksi_catatan: "",
   };
 }
@@ -71,7 +71,7 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
     nilai: rekod.nilai ?? NILAI_ASAL,
     aktiviti: rekod.aktiviti.length ? rekod.aktiviti : ["", "", "", "", "", ""],
     refleksi_peratus: rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : "",
-    refleksi_berjaya: rekod.refleksi_berjaya == null ? "" : rekod.refleksi_berjaya ? "ya" : "tidak",
+    refleksi_berjaya: bacaStatusRefleksi(rekod.refleksi_berjaya),
     refleksi_catatan: rekod.refleksi_catatan ?? "",
   };
 }
@@ -79,12 +79,10 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
 export function muatanSimpan(borang: BorangRphNilai) {
   const teksPeratus = String(borang.refleksi_peratus ?? "").replace(/%/g, "").trim();
   const peratus = teksPeratus === "" ? Number.NaN : Number(teksPeratus);
-  const ditanda = borang.refleksi_berjaya === "ya" || borang.refleksi_berjaya === "tidak";
   return {
     ...borang,
     refleksi_peratus: Number.isFinite(peratus) ? peratus : null,
-    refleksi_berjaya: ditanda ? borang.refleksi_berjaya === "ya" : null,
-    refleksi_ditanda: ditanda,
+    refleksi_berjaya: bacaStatusRefleksi(borang.refleksi_berjaya),
     refleksi_catatan: borang.refleksi_catatan,
     nilai: borang.nilai,
   };

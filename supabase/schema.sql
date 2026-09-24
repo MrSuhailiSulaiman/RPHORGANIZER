@@ -284,7 +284,7 @@ create table if not exists public.rph (
   nilai text,
   aktiviti jsonb not null default '[]'::jsonb,
   refleksi_peratus integer,
-  refleksi_berjaya boolean,
+  refleksi_berjaya varchar not null default 'belum',
   refleksi_catatan text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -352,6 +352,51 @@ begin
 end;
 $$;
 
+-- refleksi_berjaya: boolean -> varchar supaya boleh menyimpan lebih daripada dua nilai.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'rph'
+      and column_name = 'refleksi_berjaya'
+      and udt_name = 'bool'
+  ) then
+    alter table public.rph
+      alter column refleksi_berjaya drop default;
+    alter table public.rph
+      alter column refleksi_berjaya type varchar
+      using (
+        case
+          when refleksi_berjaya is true then 'berjaya'
+          when refleksi_berjaya is false then 'tidak'
+          else 'belum'
+        end
+      );
+  end if;
+end $$;
+
+alter table public.rph alter column refleksi_berjaya set default 'belum';
+
+update public.rph
+set refleksi_berjaya = 'belum'
+where refleksi_berjaya is null or btrim(refleksi_berjaya) = '';
+
+create or replace function public.nilai_refleksi_berjaya(nilai text)
+returns varchar
+language sql
+immutable
+as $$
+  select case
+    when lower(btrim(coalesce(nilai, ''))) in ('true', 'ya', 'berjaya') then 'berjaya'
+    when lower(btrim(coalesce(nilai, ''))) in ('false', 'tidak', 'tidak berjaya') then 'tidak'
+    when btrim(coalesce(nilai, '')) = '' then 'belum'
+    when lower(btrim(nilai)) in ('belum', 'belum dilaksanakan') then 'belum'
+    else btrim(nilai)
+  end::varchar;
+$$;
+
 create or replace function public.simpan_rph(payload jsonb)
 returns uuid
 language plpgsql
@@ -388,10 +433,7 @@ begin
       nullif(payload->>'nilai', ''),
       coalesce(payload->'aktiviti', '[]'::jsonb),
       nullif(payload->>'refleksi_peratus', '')::integer,
-      case
-        when payload->>'refleksi_berjaya' is null then null
-        else (payload->>'refleksi_berjaya')::boolean
-      end,
+      public.nilai_refleksi_berjaya(payload->>'refleksi_berjaya'),
       nullif(payload->>'refleksi_catatan', '')
     ) returning id into v_id;
   else
@@ -414,14 +456,8 @@ begin
       aktiviti = coalesce(payload->'aktiviti', aktiviti),
       refleksi_peratus = nullif(payload->>'refleksi_peratus', '')::integer,
       refleksi_berjaya = case
-        when payload ? 'refleksi_ditanda' and (payload->>'refleksi_ditanda') in ('false', 'f') then null
-        when payload ? 'refleksi_berjaya' then
-          case
-            when payload->'refleksi_berjaya' = 'null'::jsonb then null
-            when nullif(payload->>'refleksi_berjaya', '') is null then null
-            else (payload->>'refleksi_berjaya')::boolean
-          end
-        else refleksi_berjaya
+        when payload ? 'refleksi_berjaya' then public.nilai_refleksi_berjaya(payload->>'refleksi_berjaya')
+        else coalesce(refleksi_berjaya, 'belum')
       end,
       refleksi_catatan = nullif(payload->>'refleksi_catatan', ''),
       updated_at = now()

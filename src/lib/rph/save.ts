@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { gabungBidangSama } from "@/lib/dskp/gabung";
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
-import type { KurikulumPilihan, RphRekod, RphStandard } from "./types";
+import { bacaStatusRefleksi, type KurikulumPilihan, type RphRekod, type RphStandard } from "./types";
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
@@ -51,13 +51,6 @@ function bacaNombor(value: unknown): number | null {
   return null;
 }
 
-function bacaBoolean(value: unknown): boolean | null {
-  if (typeof value === "boolean") return value;
-  if (value === "true" || value === "ya") return true;
-  if (value === "false" || value === "tidak") return false;
-  return null;
-}
-
 function mapRph(row: Record<string, unknown>): RphRekod {
   return {
     id: String(row.id),
@@ -78,18 +71,15 @@ function mapRph(row: Record<string, unknown>): RphRekod {
     nilai: row.nilai ? String(row.nilai) : null,
     aktiviti: asStringArray(row.aktiviti),
     refleksi_peratus: bacaNombor(row.refleksi_peratus),
-    refleksi_berjaya: bacaBoolean(row.refleksi_berjaya),
+    refleksi_berjaya: bacaStatusRefleksi(row.refleksi_berjaya),
     refleksi_catatan: row.refleksi_catatan ? String(row.refleksi_catatan) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
 }
 
-function bacaRefleksiBerjaya(payload: Record<string, unknown>): boolean | null {
-  if (payload.refleksi_ditanda === false || payload.refleksi_berjaya === "" || payload.refleksi_berjaya == null) {
-    return null;
-  }
-  return bacaBoolean(payload.refleksi_berjaya);
+function bacaRefleksiBerjaya(payload: Record<string, unknown>): string {
+  return bacaStatusRefleksi(payload.refleksi_berjaya);
 }
 
 function barisRphDariMuatan(payload: Record<string, unknown>, penggunaId: string) {
@@ -135,9 +125,7 @@ async function tulisBarisRph(
     return String(data.id);
   }
 
-  const rpc = await supabase.rpc("simpan_rph", {
-    payload: { ...baris, refleksi_ditanda: baris.refleksi_berjaya != null },
-  });
+  const rpc = await supabase.rpc("simpan_rph", { payload: baris });
   if (rpc.error) throw error ? skemaRalat(error) : skemaRalat(rpc.error);
   const id = rpc.data ? String(rpc.data) : baris.id;
   await tulisNilaiRefleksi(supabase, [{ ...baris, id }]);
@@ -446,19 +434,6 @@ async function kemaskiniRefleksi(klien: SupabaseClient, item: BarisRefleksi) {
     disimpan = semak.data;
   }
   if (!disimpan) return;
-
-  if (item.refleksi_berjaya == null && disimpan.refleksi_berjaya != null) {
-    const semula = await klien
-      .from("rph")
-      .update({ refleksi_berjaya: null })
-      .eq("id", item.id)
-      .select("refleksi_berjaya")
-      .maybeSingle();
-    if (semula.error) throw skemaRalat(semula.error);
-    if (semula.data?.refleksi_berjaya != null) {
-      throw new Error("Nilai refleksi berjaya tidak dapat dikosongkan.");
-    }
-  }
 }
 
 async function tulisNilaiRefleksi(klien: SupabaseClient, senarai: BarisRefleksi[]) {

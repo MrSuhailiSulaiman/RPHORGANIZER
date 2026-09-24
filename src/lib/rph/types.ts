@@ -1,3 +1,18 @@
+export const STATUS_REFLEKSI_ASAL = "belum";
+
+/** Teks yang disimpan dalam lajur varchar `refleksi_berjaya`. */
+export function bacaStatusRefleksi(value: unknown): string {
+  if (value === true || value === "true" || value === "ya") return "berjaya";
+  if (value === false || value === "false") return "tidak";
+  const teks = typeof value === "string" ? value.trim() : "";
+  if (!teks || teks.toLowerCase() === "null") return STATUS_REFLEKSI_ASAL;
+  const kecil = teks.toLowerCase();
+  if (kecil === "berjaya") return "berjaya";
+  if (kecil === "tidak" || kecil === "tidak berjaya") return "tidak";
+  if (kecil === "belum" || kecil === "belum dilaksanakan") return "belum";
+  return teks;
+}
+
 export type RphStandard = {
   kod: string;
   pernyataan: string;
@@ -23,7 +38,7 @@ export type RphRekod = {
   nilai: string | null;
   aktiviti: string[];
   refleksi_peratus: number | null;
-  refleksi_berjaya: boolean | null;
+  refleksi_berjaya: string;
   refleksi_catatan: string | null;
   created_at: string;
   updated_at: string;

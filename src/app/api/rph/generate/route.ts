@@ -103,7 +103,7 @@ export async function POST(request: Request) {
         nilai: bahan.nilai,
         aktiviti: pilihAktivitiUntukSesi(bahan, indeks, kunci),
         refleksi_peratus: null,
-        refleksi_berjaya: null,
+        refleksi_berjaya: "belum",
       };
     });
 

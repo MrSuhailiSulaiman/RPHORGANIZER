@@ -1,6 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, PageSizes, rgb, StandardFonts } from "pdf-lib";
 import { HARI_LIST } from "@/lib/jadual/types";
-import type { RphRekod } from "./types";
+import { bacaStatusRefleksi, type RphRekod } from "./types";
 
 const MARGIN = 36;
 const BIRU = rgb(111 / 255, 159 / 255, 196 / 255);
@@ -35,14 +35,17 @@ function isi(nilai: string | null | undefined) {
   return bersih || "-";
 }
 
+function ayatStatusRefleksi(status: string) {
+  if (status === "berjaya") return "Murid berjaya menguasai objektif pembelajaran dengan baik";
+  if (status === "tidak") return "Murid tidak berjaya menguasai objektif pembelajaran dengan baik";
+  if (status === "belum") return "Belum Dilaksanakan";
+  return status;
+}
+
 export function teksRefleksiPdf(rekod: RphRekod) {
   return [
     rekod.refleksi_peratus != null ? `Peratus penguasaan: ${rekod.refleksi_peratus}%` : "",
-    rekod.refleksi_berjaya == null
-      ? ""
-      : rekod.refleksi_berjaya
-        ? "Murid berjaya menguasai objektif pembelajaran dengan baik"
-        : "Murid tidak berjaya menguasai objektif pembelajaran dengan baik",
+    ayatStatusRefleksi(bacaStatusRefleksi(rekod.refleksi_berjaya)),
     rekod.refleksi_catatan ?? "",
   ]
     .map((item) => teksPdf(item))

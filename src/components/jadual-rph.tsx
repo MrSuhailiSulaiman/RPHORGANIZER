@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,13 +70,17 @@ function muatKurikulum(mata: string, tingkatan: string) {
   return janji;
 }
 
-function KotakTanda({
+function PilihanRadio({
+  name,
+  value,
   checked,
   disabled,
   onChange,
   label,
   children,
 }: {
+  name: string;
+  value: string;
   checked: boolean;
   disabled?: boolean;
   onChange: () => void;
@@ -84,24 +88,21 @@ function KotakTanda({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange()}
+    <label
       className={`flex items-center gap-2 text-left ${disabled ? "cursor-default opacity-70" : "cursor-pointer"}`}
     >
-      <span
-        className={`inline-flex size-4 shrink-0 items-center justify-center rounded-[2px] border ${
-          checked ? "border-[#0b57d0] bg-[#0b57d0]" : "border-slate-600 bg-white"
-        }`}
-      >
-        {checked ? <Check className="size-3 text-white" strokeWidth={3} /> : null}
-      </span>
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        aria-label={label}
+        onChange={() => onChange()}
+        className="size-4 shrink-0 accent-[#0b57d0]"
+      />
       {children}
-    </button>
+    </label>
   );
 }
 
@@ -244,11 +245,8 @@ export function JadualRph({
     });
   }
 
-  function pilihRefleksi(nilai: "ya" | "tidak") {
-    const semasa = borangRujukan.current.refleksi_berjaya;
-    kemaskini({
-      refleksi_berjaya: semasa === nilai ? "" : nilai,
-    });
+  function pilihRefleksi(nilai: string) {
+    kemaskini({ refleksi_berjaya: nilai });
   }
 
   return (
@@ -546,7 +544,7 @@ export function JadualRph({
             </td>
           </tr>
           <tr>
-            <th className={labelCell} rowSpan={3}>
+            <th className={labelCell} rowSpan={4}>
               Refleksi
             </th>
             <td className={cell} colSpan={1}>
@@ -563,23 +561,27 @@ export function JadualRph({
               </div>
             </td>
             <td className={cell} colSpan={4}>
-              <KotakTanda
-                checked={borang.refleksi_berjaya === "ya"}
+              <PilihanRadio
+                name={`refleksi-${borang.id || borang.sesi_id || "baru"}`}
+                value="berjaya"
+                checked={borang.refleksi_berjaya === "berjaya"}
                 disabled={bacaSahaja}
-                onChange={() => pilihRefleksi("ya")}
+                onChange={() => pilihRefleksi("berjaya")}
                 label="Murid berjaya menguasai objektif pembelajaran dengan baik"
               >
                 <span>
                   Murid <strong className="text-green-700">berjaya</strong> menguasai objektif pembelajaran
                   dengan baik
                 </span>
-              </KotakTanda>
+              </PilihanRadio>
             </td>
           </tr>
           <tr>
             <td className={cell} colSpan={1} />
             <td className={cell} colSpan={4}>
-              <KotakTanda
+              <PilihanRadio
+                name={`refleksi-${borang.id || borang.sesi_id || "baru"}`}
+                value="tidak"
                 checked={borang.refleksi_berjaya === "tidak"}
                 disabled={bacaSahaja}
                 onChange={() => pilihRefleksi("tidak")}
@@ -589,7 +591,22 @@ export function JadualRph({
                   Murid <strong className="text-red-700">tidak berjaya</strong> menguasai objektif
                   pembelajaran dengan baik
                 </span>
-              </KotakTanda>
+              </PilihanRadio>
+            </td>
+          </tr>
+          <tr>
+            <td className={cell} colSpan={1} />
+            <td className={cell} colSpan={4}>
+              <PilihanRadio
+                name={`refleksi-${borang.id || borang.sesi_id || "baru"}`}
+                value="belum"
+                checked={borang.refleksi_berjaya === "belum"}
+                disabled={bacaSahaja}
+                onChange={() => pilihRefleksi("belum")}
+                label="Belum Dilaksanakan"
+              >
+                <span>Belum Dilaksanakan</span>
+              </PilihanRadio>
             </td>
           </tr>
           <tr>
