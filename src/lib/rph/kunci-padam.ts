@@ -34,12 +34,8 @@ async function kunciGeminiDariSupabase() {
 
 export async function kunciGemini() {
   await connection();
-  for (let cubaan = 0; cubaan < 8; cubaan += 1) {
-    const key = geminiApiKey();
-    if (key) return key;
-    await new Promise((selesai) => setTimeout(selesai, 80 * (cubaan + 1)));
-    await connection();
-  }
+  const terus = geminiApiKey();
+  if (terus) return terus;
   const simpanan = await kunciGeminiDariSupabase();
   if (simpanan) {
     tetapkanGeminiEnv(simpanan);

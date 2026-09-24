@@ -90,33 +90,37 @@ export function supabaseRuntimeConfig() {
   };
 }
 
-function kunciGeminiStatik() {
-  return (
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    ""
-  ).trim();
+function nilaiEnv(nama: string) {
+  const peta = globalThis.process?.env;
+  const nilai = peta?.[nama];
+  return typeof nilai === "string" ? nilai.trim() : "";
 }
 
 export function geminiApiKey() {
-  const terus = kunciGeminiStatik();
-  if (terus) {
-    tetapkanGeminiEnv(terus);
-    return terus;
-  }
-  const semua = semuaEnv();
-  const names = [
-    ["GOOGLE", "GENERATIVE", "AI", "API", "KEY"].join("_"),
-    ["GEMINI", "API", "KEY"].join("_"),
-    ["GOOGLE", "API", "KEY"].join("_"),
+  // Rujukan process.env.NAMA wajib supaya Next.js memasukkan kunci ke fungsi pelayan.
+  // Nilai dibaca semula pada runtime kerana Vercel mungkin tidak mendedahkan rahsia semasa build.
+  const calon = [
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    process.env.GEMINI_API_KEY,
+    process.env.GOOGLE_API_KEY,
+    nilaiEnv("GOOGLE_GENERATIVE_AI_API_KEY"),
+    nilaiEnv("GEMINI_API_KEY"),
+    nilaiEnv("GOOGLE_API_KEY"),
   ];
-  let key = names.map((name) => semua[name]).find((value) => value) ?? "";
+  let key = calon.find((nilai) => nilai?.trim())?.trim() ?? "";
   if (!key) {
-    for (const [nama, nilai] of Object.entries(semua)) {
-      if (/GEMINI.*API.*KEY|GOOGLE.*GENERATIVE.*AI.*API.*KEY/i.test(nama)) {
-        key = nilai;
-        break;
+    const semua = semuaEnv();
+    key =
+      semua.GOOGLE_GENERATIVE_AI_API_KEY ||
+      semua.GEMINI_API_KEY ||
+      semua.GOOGLE_API_KEY ||
+      "";
+    if (!key) {
+      for (const [nama, nilai] of Object.entries(semua)) {
+        if (/GEMINI.*API.*KEY|GOOGLE.*GENERATIVE.*AI.*API.*KEY/i.test(nama)) {
+          key = nilai;
+          break;
+        }
       }
     }
   }
@@ -125,9 +129,9 @@ export function geminiApiKey() {
 }
 
 export function tetapkanGeminiEnv(key: string) {
-  if (!key) return;
-  process.env.GOOGLE_GENERATIVE_AI_API_KEY = key;
-  process.env.GEMINI_API_KEY = key;
+  if (!key || !globalThis.process?.env) return;
+  globalThis.process.env.GOOGLE_GENERATIVE_AI_API_KEY = key;
+  globalThis.process.env.GEMINI_API_KEY = key;
   env.GOOGLE_GENERATIVE_AI_API_KEY = key;
   env.GEMINI_API_KEY = key;
 }
