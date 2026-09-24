@@ -183,29 +183,72 @@ export function pilihAktivitiUntukSesi(bahan: BahanRph, indeksKemunculan: number
   return amalan[(indeksKemunculan + hashBiji(biji)) % amalan.length];
 }
 
-function arahanObjektifDaripadaSp() {
+function arahanObjektifDaripadaSp(sp?: { kod: string; pernyataan: string }[]) {
+  const terpilih = (sp ?? []).filter((item) => item.kod.trim());
+  const contoh = terpilih[0];
+  const kod = terpilih.map((item) => item.kod.trim());
+  const contohKod = contoh?.kod.trim() || "KOD";
+  const contohAyat = contoh?.pernyataan.trim() || "pernyataan Standard Pembelajaran dalam data";
+  const rujukan = kod.length
+    ? kod.join(", ")
+    : "kod Standard Pembelajaran yang diberi dalam data. Jangan cipta kod baharu dan jangan salin perkataan KOD";
   return `LANGKAH 1 — ANALISIS setiap Standard Pembelajaran. Jangan salin ayatnya.
 Untuk setiap SP pecahkan: kod, kata kerja DSKP, konsep yang mesti dikuasai, dan bukti yang boleh dikira dalam SATU sesi PdP.
 
 LANGKAH 2 — TULIS 2-3 objektif yang MENGOPERASIKAN hasil analisis itu.
 Setiap objektif SATU ayat panjang bermula "Murid dapat ...".
 
+WAJIB RUJUK STANDARD PEMBELAJARAN:
+- Setiap objektif mesti menyebut kod SP yang dirujuk, disalin tepat: ${rujukan}.
+- Letakkan kod itu dalam frasa "berkaitan ${contohKod}".
+- Jika lebih daripada satu SP dipilih, setiap objektif menyebut kod SP yang dioperasikannya. Semua kod terpilih mesti muncul sekurang-kurangnya sekali.
+- Jangan salin ayat penuh SP. Sebut kod, kemudian tulis tingkah laku murid yang boleh diukur.
+
 DILARANG:
-- "Murid dapat " diikuti ayat Standard Pembelajaran (contoh dilarang: "Murid dapat menerangkan keperluan penyelesaian masalah berstrategi").
+- "Murid dapat " diikuti ayat Standard Pembelajaran (contoh dilarang: "Murid dapat ${contohAyat}").
+- Objektif yang tidak mengandungi kod SP.
 - Kata kerja kabur: memahami, mengetahui, menghayati, menyedari, menghargai.
 - Perkataan: beberapa, pelbagai, sesuai.
 
-WAJIB dalam SETIAP objektif — sekurang-kurangnya DUA nombor Arab yang guru boleh semak ya/tidak:
+WAJIB dalam SETIAP objektif — sekurang-kurangnya DUA nombor Arab yang guru boleh semak ya/tidak, selain kod SP:
 - menyatakan / memberi contoh → berapa contoh (contoh 3)
 - menyenaraikan → berapa perkara (contoh 4) + berapa senario/justifikasi
 - membandingkan → berapa perbezaan (contoh 3) + masa atau bilangan hujah
 - menulis/menghasilkan → berapa langkah/ayat + kriteria ketepatan
 - membentangkan → berapa isi atau berapa minit
 
-GAYA YANG WAJIB DIIKUTI (isi mengikut SP yang dianalisis):
-"Murid dapat menyatakan 3 contoh … secara lisan/bertulis berdasarkan 1 senario … dengan 2 justifikasi yang tepat."
-"Murid dapat menyenaraikan 4 keperluan … berdasarkan 1 senario … dengan 2 justifikasi yang tepat."
-"Murid dapat membandingkan 3 perbezaan … dalam masa 10 minit, dengan sekurang-kurangnya 2 hujah yang logik."`;
+GAYA YANG WAJIB DIIKUTI untuk "${contohKod} ${contohAyat}":
+"Murid dapat menyatakan 3 contoh berkaitan ${contohKod} secara bertulis berdasarkan 1 senario atur cara, dengan 2 justifikasi yang tepat."
+"Murid dapat menyenaraikan 4 keperluan berkaitan ${contohKod} berdasarkan 1 senario, dengan 2 justifikasi yang tepat."
+"Murid dapat membandingkan 3 perbezaan berkaitan ${contohKod} dalam masa 10 minit, dengan sekurang-kurangnya 2 hujah yang logik."`;
+}
+
+function adaKodSp(ayat: string, kod: string) {
+  const escaped = kod.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![0-9.])${escaped}(?![0-9.])`).test(ayat);
+}
+
+function sisipKodSp(ayat: string, kod: string) {
+  if (adaKodSp(ayat, kod)) return ayat;
+  if (/\bberkaitan\b/i.test(ayat)) return ayat.replace(/\bberkaitan\b/i, `berkaitan ${kod}`);
+  const berdasar = ayat.search(/\bberdasarkan\b/i);
+  if (berdasar >= 0) return `${ayat.slice(0, berdasar)}berkaitan ${kod} ${ayat.slice(berdasar)}`;
+  const padanan = ayat.match(/^(Murid dapat\s+\S+(?:\s+\d+)?(?:\s+\S+)?)/i);
+  if (padanan) return `${padanan[1]} berkaitan ${kod}${ayat.slice(padanan[1].length)}`;
+  return `${ayat.replace(/\.\s*$/, "")} berkaitan ${kod}.`;
+}
+
+/** Pastikan setiap objektif menyebut kod Standard Pembelajaran yang dipilih. */
+export function pastikanKodDalamObjektif(objektif: string[], sp: { kod: string }[]) {
+  const kod = [...new Set(sp.map((item) => item.kod.trim()).filter(Boolean))];
+  const hasil = objektif.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  if (!kod.length || !hasil.length) return hasil;
+  const belum = kod.filter((item) => !hasil.some((ayat) => adaKodSp(ayat, item)));
+  return hasil.map((ayat, indeks) => {
+    if (kod.some((item) => adaKodSp(ayat, item))) return ayat;
+    const sasaran = belum.shift() ?? kod[Math.min(indeks, kod.length - 1)];
+    return sisipKodSp(ayat, sasaran);
+  });
 }
 
 function senaraiKaedah() {
@@ -265,7 +308,7 @@ Konteks sesi:
 Standard Pembelajaran yang mesti dianalisis (jangan cipta kod baharu):
 ${senaraiSp(sp)}
 
-${arahanObjektifDaripadaSp()}`;
+${arahanObjektifDaripadaSp(sp)}`;
 }
 
 export async function janaObjektifSesi(input: KonteksSesi, apiKey?: string): Promise<string[]> {
@@ -274,11 +317,11 @@ export async function janaObjektifSesi(input: KonteksSesi, apiKey?: string): Pro
     objektifSahajaSchema,
     `${promptKonteksSesi(input, sp)}
 
-Hasilkan HANYA medan objektif. Setiap objektif mesti lahir daripada analisis SP di atas, bukan salinan ayat SP.`,
+Hasilkan HANYA medan objektif. Setiap objektif mesti menyebut kod Standard Pembelajaran dalam frasa "berkaitan {kod}" dan lahir daripada analisis SP, bukan salinan ayat SP.`,
     apiKey
   );
   if (!output?.objektif?.length) throw new Error("Gemini tidak menghasilkan objektif.");
-  return output.objektif.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  return pastikanKodDalamObjektif(output.objektif, sp);
 }
 
 export async function janaBahanSesi(input: KonteksSesi, apiKey?: string): Promise<BahanRph> {
@@ -304,7 +347,7 @@ Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
 
   if (!output) throw new Error("Gemini tidak menghasilkan objektif dan aktiviti.");
   return {
-    objektif: output.objektif.map((item) => item.trim()).filter(Boolean).slice(0, 3),
+    objektif: pastikanKodDalamObjektif(output.objektif, sp),
     bbm: output.bbm.trim(),
     nilai: (output.nilai || "PEMIKIR").trim(),
     aktiviti: masteri ? bersihAktiviti(output.aktiviti) : tandaKaedah(bersihAktiviti(output.aktiviti), kaedah),
@@ -312,8 +355,9 @@ Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
 }
 
 /** Bahan tanpa Gemini: tiga kaedah PdP berbeza dan satu set semakan masteri. */
-export function bahanSandaran(tajuk?: string): BahanRph {
+export function bahanSandaran(tajuk?: string, kodSp?: string): BahanRph {
   const konsep = tajuk?.trim() || "isi pelajaran";
+  const rujukan = kodSp?.trim() || konsep;
   const inkuiri = [
     `Kaedah Pembelajaran Inkuiri: murid meneliti 1 senario berkaitan ${konsep} dan menulis 2 soalan siasatan pada kertas nota.`,
     `Murid berpasangan membuat ramalan dan menyiasat 4 bukti berkaitan ${konsep} menggunakan buku teks atau bahan yang disediakan.`,
@@ -348,8 +392,8 @@ export function bahanSandaran(tajuk?: string): BahanRph {
   ];
   return {
     objektif: [
-      `Murid dapat menyatakan 3 contoh berkaitan ${konsep} secara bertulis pada lembaran kerja individu berdasarkan 1 senario yang diberi, dengan 2 justifikasi yang tepat.`,
-      `Murid dapat menyenaraikan 4 isi utama ${konsep} dalam kumpulan dalam masa 10 minit, kemudian membentangkan sekurang-kurangnya 2 hujah yang logik.`,
+      `Murid dapat menyatakan 3 contoh berkaitan ${rujukan} secara bertulis pada lembaran kerja individu berdasarkan 1 senario yang diberi, dengan 2 justifikasi yang tepat.`,
+      `Murid dapat menyenaraikan 4 isi utama berkaitan ${rujukan} dalam kumpulan dalam masa 10 minit, kemudian membentangkan sekurang-kurangnya 2 hujah yang logik.`,
     ],
     bbm: "Buku teks, lembaran kerja, kertas sebak, pen marker, kad soalan, rubrik, projektor LCD",
     nilai: "PEMIKIR",
@@ -360,7 +404,11 @@ export function bahanSandaran(tajuk?: string): BahanRph {
 }
 
 function bahanAsal(unit: UnitKurikulum): BahanRph {
-  return bahanSandaran(unit.sk_tajuk || unit.sk_kod);
+  const kod = unit.standard_pembelajaran
+    .map((item) => item.kod.trim())
+    .filter(Boolean)
+    .join(", ");
+  return bahanSandaran(unit.sk_tajuk || unit.sk_kod, kod);
 }
 
 /** Gemini kadangkala balas "1.1 Strategi ..." untuk sk_kod "1.1"; padankan semula ke kod yang sah. */
@@ -454,7 +502,10 @@ ${JSON.stringify(bahagian, null, 2)}`
           console.error("janaBahanKurikulum_sk_tidak_padan", item.sk_kod);
           continue;
         }
-        peta.set(kunci, petaDariGemini(item));
+        const unit = unitList.find((calon) => calon.sk_kod === kunci);
+        const bahan = petaDariGemini(item);
+        if (unit) bahan.objektif = pastikanKodDalamObjektif(bahan.objektif, unit.standard_pembelajaran);
+        peta.set(kunci, bahan);
       }
     } catch (error) {
       console.error("janaBahanKurikulum", error);

@@ -81,7 +81,10 @@ export async function POST(request: Request) {
 
     /** Guru tidak boleh tersekat: beri templat yang boleh disunting apabila Gemini gagal. */
     function sandaran(sebab: string) {
-      const bahan = bahanSandaran(konteks.sk_tajuk || konteks.sk_kod || standard[0].pernyataan);
+      const bahan = bahanSandaran(
+        konteks.sk_tajuk || konteks.sk_kod || standard[0].pernyataan,
+        standard.map((item) => item.kod).filter(Boolean).join(", ")
+      );
       const isi = hanyaObjektif
         ? { objektif: bahan.objektif }
         : {
