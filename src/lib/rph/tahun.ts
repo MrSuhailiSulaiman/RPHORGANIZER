@@ -129,6 +129,81 @@ export function ratakanKurikulum(kurikulum: KurikulumPilihan): UnitKurikulum[] {
   return unit;
 }
 
+/** Satu unit bagi setiap Standard Pembelajaran, mengikut urutan DSKP. */
+export function ratakanStandard(kurikulum: KurikulumPilihan): UnitKurikulum[] {
+  const unit: UnitKurikulum[] = [];
+  for (const bidang of kurikulum.bidang) {
+    for (const sk of bidang.standard_kandungan) {
+      const asas = unitDariSk(kurikulum, bidang, sk);
+      if (!asas) continue;
+      const sp = (sk.standard_pembelajaran ?? []).filter(
+        (item) => item.kod?.trim() || item.pernyataan?.trim()
+      );
+      if (!sp.length) {
+        unit.push(asas);
+        continue;
+      }
+      for (const item of sp) {
+        unit.push({
+          ...asas,
+          kunci: `${asas.kunci}|${item.kod}`,
+          standard_pembelajaran: [item],
+        });
+      }
+    }
+  }
+  return unit;
+}
+
+export function kunciUnit(unit: UnitKurikulum) {
+  const kod = unit.standard_pembelajaran.map((item) => item.kod.trim()).filter(Boolean);
+  return kod.length ? kod.join("+") : unit.sk_kod;
+}
+
+/** Bahagi item kepada `slot` kumpulan. Setiap item muncul, dan lebihan slot mengulang item secara sekata. */
+export function bahagiSekata<T>(item: T[], slot: number): T[][] {
+  if (slot <= 0) return [];
+  const hasil: T[][] = Array.from({ length: slot }, () => []);
+  if (!item.length) return hasil;
+  if (item.length >= slot) {
+    for (let i = 0; i < slot; i += 1) {
+      const mula = Math.floor((i * item.length) / slot);
+      const tamat = Math.floor(((i + 1) * item.length) / slot);
+      hasil[i] = item.slice(mula, tamat);
+    }
+    return hasil;
+  }
+  for (let i = 0; i < slot; i += 1) {
+    const indeks = Math.min(item.length - 1, Math.floor((i * item.length) / slot));
+    hasil[i] = [item[indeks]];
+  }
+  return hasil;
+}
+
+function gabungUnit(senarai: UnitKurikulum[]): UnitKurikulum | null {
+  if (!senarai.length) return null;
+  const pertama = senarai[0];
+  if (senarai.length === 1) return pertama;
+  const samaSk = senarai.every((item) => item.sk_kod === pertama.sk_kod);
+  const samaBidang = senarai.every((item) => item.bidang_kod === pertama.bidang_kod);
+  return {
+    kunci: senarai.map((item) => item.kunci).join("|"),
+    bidang_kod: samaBidang
+      ? pertama.bidang_kod
+      : [...new Set(senarai.map((item) => item.bidang_kod).filter(Boolean))].join(", "),
+    bidang_nama: samaBidang
+      ? pertama.bidang_nama
+      : [...new Set(senarai.map((item) => item.bidang_nama).filter(Boolean))].join("; "),
+    sk_kod: samaSk
+      ? pertama.sk_kod
+      : [...new Set(senarai.map((item) => item.sk_kod).filter(Boolean))].join(", "),
+    sk_tajuk: samaSk
+      ? pertama.sk_tajuk
+      : senarai.map((item) => item.sk_tajuk).filter(Boolean).join("; "),
+    standard_pembelajaran: senarai.flatMap((item) => item.standard_pembelajaran),
+  };
+}
+
 function normalNama(value: string) {
   return value
     .toLowerCase()
@@ -184,7 +259,7 @@ export function unitUntukSlot(slot: SlotTahun, senarai: KurikulumPilihan[]) {
     (slot.dokumen_id ? senarai.find((item) => item.dokumen_id === slot.dokumen_id) : null) ??
     padankanKurikulum(slot.sesi, senarai);
   return (
-    lengkapkanUnit(slot.unit) ?? lengkapkanUnit(dokumen ? ratakanKurikulum(dokumen)[0] : undefined)
+    lengkapkanUnit(slot.unit) ?? lengkapkanUnit(dokumen ? ratakanStandard(dokumen)[0] : undefined)
   );
 }
 
@@ -205,7 +280,6 @@ export function susunSlotTahun(params: {
   const unitMengikutKunci = new Map<string, UnitKurikulum[]>();
   const dokumenMengikutKunci = new Map<string, string>();
   const kursor = new Map<string, number>();
-  const baki = new Map<string, number>();
   const kiraMingguan = new Map<string, number>();
 
   for (const sesi of mingguan) {
@@ -213,28 +287,25 @@ export function susunSlotTahun(params: {
     kiraMingguan.set(kunci, (kiraMingguan.get(kunci) ?? 0) + 1);
     if (unitMengikutKunci.has(kunci)) continue;
     const kurikulum = padankanKurikulum(sesi, params.kurikulum);
-    unitMengikutKunci.set(kunci, kurikulum ? ratakanKurikulum(kurikulum) : []);
+    unitMengikutKunci.set(kunci, kurikulum ? ratakanStandard(kurikulum) : []);
     if (kurikulum) dokumenMengikutKunci.set(kunci, kurikulum.dokumen_id);
   }
 
-  function unitSeterusnya(kunci: string) {
-    const unitList = unitMengikutKunci.get(kunci) ?? [];
-    if (!unitList.length) return null;
+  const giliran = new Map<string, Array<UnitKurikulum | null>>();
+  for (const [kunci, unitList] of unitMengikutKunci) {
     const jumlahSlot = (kiraMingguan.get(kunci) ?? 1) * bilMinggu;
-    const tempoh = Math.max(1, Math.floor(jumlahSlot / unitList.length));
-    let indeks = kursor.get(kunci) ?? 0;
-    let tinggal = baki.get(kunci);
-    if (tinggal == null) tinggal = tempoh;
-    const unit = unitList[Math.min(indeks, unitList.length - 1)];
-    tinggal -= 1;
-    if (tinggal <= 0 && indeks < unitList.length - 1) {
-      kursor.set(kunci, indeks + 1);
-      baki.set(kunci, tempoh);
-    } else {
-      kursor.set(kunci, indeks);
-      baki.set(kunci, tinggal);
-    }
-    return unit;
+    giliran.set(
+      kunci,
+      bahagiSekata(unitList, jumlahSlot).map((kumpulan) => gabungUnit(kumpulan))
+    );
+  }
+
+  function unitSeterusnya(kunci: string) {
+    const senarai = giliran.get(kunci) ?? [];
+    if (!senarai.length) return null;
+    const indeks = kursor.get(kunci) ?? 0;
+    kursor.set(kunci, indeks + 1);
+    return senarai[Math.min(indeks, senarai.length - 1)] ?? null;
   }
 
   const slots: SlotTahun[] = [];

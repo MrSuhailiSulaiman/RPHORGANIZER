@@ -9,6 +9,7 @@ import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save
 import {
   BIL_MINGGU_TAHUN,
   isninPadaAtauSelepas,
+  kunciUnit,
   susunSlotTahun,
   tarikhMulaTahunAsal,
   tarikhSlot,
@@ -70,7 +71,12 @@ export async function POST(request: Request) {
     const idDigunakan = new Set(slots.map((item) => item.dokumen_id).filter((id): id is string => Boolean(id)));
     for (const item of kurikulum) {
       if (!idDigunakan.has(item.dokumen_id)) continue;
-      bahanMengikutDokumen.set(item.dokumen_id, await janaBahanKurikulum(item));
+      const unik = new Map<string, NonNullable<(typeof slots)[number]["unit"]>>();
+      for (const slot of slots) {
+        if (slot.dokumen_id !== item.dokumen_id || !slot.unit) continue;
+        unik.set(kunciUnit(slot.unit), slot.unit);
+      }
+      bahanMengikutDokumen.set(item.dokumen_id, await janaBahanKurikulum(item, [...unik.values()]));
     }
 
     const sandaran = bahanSandaran();
@@ -79,9 +85,10 @@ export async function POST(request: Request) {
       const unit = unitUntukSlot(slot, kurikulum);
       const bahan =
         (unit && slot.dokumen_id
-          ? bahanMengikutDokumen.get(slot.dokumen_id)?.get(unit.sk_kod)
-          : undefined) ?? sandaran;
-      const kunci = `${slot.sesi.mata_pelajaran}|${slot.sesi.kelas}|${unit?.sk_kod ?? ""}`.toLowerCase();
+          ? bahanMengikutDokumen.get(slot.dokumen_id)?.get(kunciUnit(unit))
+          : undefined) ??
+        (unit ? bahanSandaran(unit.sk_tajuk, unit.standard_pembelajaran.map((sp) => sp.kod).filter(Boolean).join(", ")) : sandaran);
+      const kunci = `${slot.sesi.mata_pelajaran}|${slot.sesi.kelas}|${unit ? kunciUnit(unit) : ""}`.toLowerCase();
       const indeks = kiraanSk.get(kunci) ?? 0;
       kiraanSk.set(kunci, indeks + 1);
 

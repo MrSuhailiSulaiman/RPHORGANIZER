@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { geminiApiKey } from "@/lib/runtime-env";
 import type { KurikulumPilihan } from "./types";
-import { ratakanKurikulum, type UnitKurikulum } from "./tahun";
+import { kunciUnit, type UnitKurikulum } from "./tahun";
 
 export type BahanRph = {
   objektif: string[];
@@ -412,6 +412,13 @@ function bahanAsal(unit: UnitKurikulum): BahanRph {
 }
 
 /** Gemini kadangkala balas "1.1 Strategi ..." untuk sk_kod "1.1"; padankan semula ke kod yang sah. */
+function padanKunciUnit(kod: string, sah: string[]) {
+  const tepat = padanSkKod(kod, sah);
+  if (tepat) return tepat;
+  const bersih = kod.trim();
+  return sah.find((calon) => calon.split("+").includes(bersih)) ?? "";
+}
+
 function padanSkKod(kod: string, sah: string[]) {
   const bersih = kod.trim();
   if (!bersih) return "";
@@ -450,14 +457,14 @@ function petaDariGemini(item: {
   };
 }
 
-export async function janaBahanKurikulum(kurikulum: KurikulumPilihan) {
-  const unitList = ratakanKurikulum(kurikulum);
+export async function janaBahanKurikulum(kurikulum: KurikulumPilihan, unitTugasan?: UnitKurikulum[]) {
+  const unitList = unitTugasan?.length ? unitTugasan : [];
   const peta = new Map<string, BahanRph>();
-  for (const unit of unitList) peta.set(unit.sk_kod, bahanAsal(unit));
+  for (const unit of unitList) peta.set(kunciUnit(unit), bahanAsal(unit));
   if (!unitList.length || !hasGeminiKey()) return peta;
 
   const ringkas = unitList.map((unit) => ({
-    sk_kod: unit.sk_kod,
+    sk_kod: kunciUnit(unit),
     sk_tajuk: unit.sk_tajuk,
     bidang: unit.bidang_nama,
     standard_pembelajaran: unit.standard_pembelajaran.map((item) => ({
@@ -472,13 +479,16 @@ export async function janaBahanKurikulum(kurikulum: KurikulumPilihan) {
     try {
       const output = await janaObjek(
         bahanSchema,
-        `Anda guru pakar KSSM Malaysia. ANALISIS Standard Pembelajaran, kemudian tulis kandungan RPH untuk SETIAP Standard Kandungan dalam bahasa Melayu standard sekolah.
+        `Anda guru pakar KSSM Malaysia. ANALISIS Standard Pembelajaran yang disenaraikan, kemudian tulis kandungan RPH untuk SETIAP sesi dalam bahasa Melayu standard sekolah.
 
 Mata pelajaran: ${kurikulum.mata_pelajaran}
 Tingkatan: ${kurikulum.tingkatan ?? "-"}
 
+Setiap item ialah SATU sesi PdP. Medan sk_kod ialah pengecam sesi: salin tepat, jangan ubah.
+Objektif dan aktiviti mesti merujuk HANYA Standard Pembelajaran dalam item itu. Setiap kod SP dalam item mesti muncul.
+
 Untuk SETIAP sk_kod:
-1. ANALISIS setiap Standard Pembelajaran. Jangan salin ayat SP.
+1. ANALISIS setiap Standard Pembelajaran dalam item. Jangan salin ayat SP.
 2. objektif: 2-3 ayat TERPERINCI yang BOLEH DIUKUR.
 3. set_aktiviti: 3 set aktiviti untuk sesi PdP yang BERBEZA. Setiap set:
    - kaedah: pilih SATU kaedah daripada senarai kaedah di bawah yang PALING SESUAI dengan objektif. Setiap set WAJIB kaedah berbeza.
@@ -497,12 +507,12 @@ ${JSON.stringify(bahagian, null, 2)}`
       );
       const kodSah = bahagian.map((item) => item.sk_kod);
       for (const item of output?.bahan ?? []) {
-        const kunci = padanSkKod(item.sk_kod, kodSah);
+        const kunci = padanKunciUnit(item.sk_kod, kodSah);
         if (!kunci) {
           console.error("janaBahanKurikulum_sk_tidak_padan", item.sk_kod);
           continue;
         }
-        const unit = unitList.find((calon) => calon.sk_kod === kunci);
+        const unit = unitList.find((calon) => kunciUnit(calon) === kunci);
         const bahan = petaDariGemini(item);
         if (unit) bahan.objektif = pastikanKodDalamObjektif(bahan.objektif, unit.standard_pembelajaran);
         peta.set(kunci, bahan);

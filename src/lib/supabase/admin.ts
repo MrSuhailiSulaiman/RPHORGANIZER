@@ -1,20 +1,16 @@
-import { runtimeEnv } from "@/lib/runtime-env";
+import { kunciSupabase } from "@/lib/runtime-env";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 function supabaseUrl() {
-  return runtimeEnv("SUPABASE_URL") || runtimeEnv("NEXT_PUBLIC_SUPABASE_URL");
+  return kunciSupabase().url;
 }
 
 function supabaseServiceRoleKey() {
-  return runtimeEnv(["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_"));
+  return kunciSupabase().service;
 }
 
 function supabaseKey() {
-  return (
-    supabaseServiceRoleKey() ||
-    runtimeEnv("SUPABASE_ANON_KEY") ||
-    runtimeEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-  );
+  return kunciSupabase().key;
 }
 
 export function isSupabaseConfigured() {
@@ -23,9 +19,11 @@ export function isSupabaseConfigured() {
 
 export function createAdminClient(): SupabaseClient {
   const url = supabaseUrl();
-  const key = supabaseKey();
+  const key = supabaseServiceRoleKey();
   if (!url || !key) {
-    throw new Error("Supabase belum dikonfigurasi. Isi kunci projek pada Vercel atau .env.local.");
+    throw new Error(
+      "Kunci servis Supabase tidak dimuatkan. Semak SUPABASE_SERVICE_ROLE_KEY pada Vercel, kemudian deploy semula."
+    );
   }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },

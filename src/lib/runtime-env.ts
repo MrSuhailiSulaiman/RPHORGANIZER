@@ -72,16 +72,25 @@ function jwtRole(key: string) {
   }
 }
 
+export function kunciSupabase() {
+  // Rujukan process.env.NAMA wajib supaya Vercel memasukkan rahsia ke fungsi pelayan.
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    process.env.SUPABASE_URL?.trim() ||
+    nilaiEnv("NEXT_PUBLIC_SUPABASE_URL") ||
+    nilaiEnv("SUPABASE_URL");
+  const service =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || nilaiEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const anon =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    nilaiEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
+    nilaiEnv("SUPABASE_ANON_KEY");
+  return { url, service, anon, key: service || anon };
+}
+
 export function supabaseRuntimeConfig() {
-  const urlNama = ["NEXT_PUBLIC", "SUPABASE", "URL"].join("_");
-  const urlNama2 = ["SUPABASE", "URL"].join("_");
-  const servisNama = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
-  const anonNama = ["SUPABASE", "ANON", "KEY"].join("_");
-  const anonNama2 = ["NEXT_PUBLIC", "SUPABASE", "ANON", "KEY"].join("_");
-  const url = readEnv(urlNama2) || readEnv(urlNama);
-  const service = readEnv(servisNama);
-  const anon = readEnv(anonNama) || readEnv(anonNama2);
-  const key = service || anon;
+  const { url, service, key } = kunciSupabase();
   return {
     url,
     key,
