@@ -11,7 +11,15 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
-import { kumpulanMingguRph, mingguSemasaDalam, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { BIL_MINGGU_TAHUN, isninPadaAtauSelepas, kumpulanMingguRph, mingguSemasaDalam, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
 import { hantarPadamBerperingkat, hantarPadamRph, hantarPadamSemuaRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
@@ -21,6 +29,10 @@ export function SenaraiRph() {
   const [rph, setRph] = useState<RphRekod[]>([]);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangJana, setSedangJana] = useState(false);
+  const [sedangJanaMinggu, setSedangJanaMinggu] = useState(false);
+  const [popupMinggu, setPopupMinggu] = useState(false);
+  const [mingguJana, setMingguJana] = useState("1");
+  const [isninMinggu, setIsninMinggu] = useState(tarikhMulaTahunAsal());
   const [padamId, setPadamId] = useState<string | null>(null);
   const [dipilih, setDipilih] = useState<string[]>([]);
   const [sedangPukal, setSedangPukal] = useState(false);
@@ -177,6 +189,57 @@ export function SenaraiRph() {
       toast.error(error instanceof Error ? error.message : "Gagal memuat turun PDF RPH.");
     } finally {
       setSedangPdf(null);
+    }
+  }
+
+  function bukaJanaMinggu() {
+    if (sedangJana || sedangJanaMinggu || !sesi.length) return;
+    setIsninMinggu(tarikhMula);
+    setPopupMinggu(true);
+  }
+
+  async function janaMinggu() {
+    if (sedangJanaMinggu || sedangJana) return;
+    const minggu = Number(mingguJana);
+    if (!Number.isInteger(minggu) || minggu < 1 || minggu > BIL_MINGGU_TAHUN) {
+      toast.error(`Minggu mesti antara 1 dan ${BIL_MINGGU_TAHUN}.`);
+      return;
+    }
+    if (!isninMinggu || isninPadaAtauSelepas(isninMinggu) !== isninMinggu) {
+      toast.error("Pilih tarikh hari Isnin.");
+      return;
+    }
+    setSedangJanaMinggu(true);
+    try {
+      const res = await fetch("/api/rph/generate-minggu", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minggu, tarikh_isnin: isninMinggu }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ralat?: string;
+        bil_rph?: number;
+        tarikh_mula?: string;
+        tarikh_tamat?: string;
+      };
+      if (!res.ok) {
+        throw new Error(
+          json.ralat ??
+            (res.status === 504
+              ? "Penjanaan RPH terhenti kerana mengambil masa terlalu lama. Sila cuba lagi."
+              : "Gagal menjana RPH.")
+        );
+      }
+      await muat();
+      setPopupMinggu(false);
+      toast.success(
+        `${json.bil_rph ?? 0} RPH dijana untuk minggu ${minggu} (${json.tarikh_mula ?? isninMinggu} — ${json.tarikh_tamat ?? ""}).`
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menjana RPH.");
+    } finally {
+      setSedangJanaMinggu(false);
     }
   }
 
@@ -454,7 +517,65 @@ export function SenaraiRph() {
         </Card>
       ) : (
         <div className="space-y-4">
-          <h2 className="font-heading text-lg font-medium">Jadual waktu (Sesi PdP)</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-heading text-lg font-medium">Jadual waktu (Sesi PdP)</h2>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={bukaJanaMinggu}
+              disabled={sedangJana || sedangJanaMinggu || sedangPukal}
+            >
+              {sedangJanaMinggu ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {sedangJanaMinggu ? "Menjana RPH..." : "Generate RPH"}
+            </Button>
+          </div>
+          <Dialog
+            open={popupMinggu}
+            onOpenChange={(buka) => {
+              if (!sedangJanaMinggu) setPopupMinggu(buka);
+            }}
+          >
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Jana RPH seminggu</DialogTitle>
+                <DialogDescription>
+                  Isi minggu dan tarikh Isnin. RPH minggu itu dijana dengan susunan kurikulum yang sama seperti
+                  Generate RPH setahun.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Minggu ke-</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={BIL_MINGGU_TAHUN}
+                    value={mingguJana}
+                    onChange={(event) => setMingguJana(event.target.value)}
+                    disabled={sedangJanaMinggu}
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Tarikh Isnin</span>
+                  <Input
+                    type="date"
+                    value={isninMinggu}
+                    onChange={(event) => setIsninMinggu(event.target.value)}
+                    disabled={sedangJanaMinggu}
+                  />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setPopupMinggu(false)} disabled={sedangJanaMinggu}>
+                  Batal
+                </Button>
+                <Button type="button" onClick={() => void janaMinggu()} disabled={sedangJanaMinggu}>
+                  {sedangJanaMinggu ? <Loader2 className="animate-spin" /> : null}
+                  OK
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {kumpulan.map((kumpul) => (
             <Card key={kumpul.hari}>
               <CardHeader>

@@ -10,6 +10,9 @@
     "src/app/api/rph/generate/route.ts": {
       "maxDuration": 300
     },
+    "src/app/api/rph/generate-minggu/route.ts": {
+      "maxDuration": 300
+    },
     "src/app/api/rph/tahun/route.ts": {
       "maxDuration": 60
     },
