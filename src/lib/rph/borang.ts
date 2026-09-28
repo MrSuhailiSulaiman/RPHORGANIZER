@@ -35,6 +35,8 @@ export function terapModRph(borang: BorangRphNilai, mod: Exclude<ModRph, "pdpc">
     sk_tajuk: "",
     standard_pembelajaran: [],
     objektif: [...OBJEKTIF_PEPERIKSAAN],
+    bbm: "",
+    nilai: "",
   };
 }
 
@@ -123,9 +125,11 @@ export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
 }
 
 export function dariRekod(rekod: RphRekod): BorangRphNilai {
+  const mod = modDaripadaKandungan(rekod.objektif, rekod.aktiviti);
+  const kosongkanBahan = mod === "peperiksaan" || mod === "cuti";
   return {
     id: rekod.id,
-    mod: modDaripadaKandungan(rekod.objektif, rekod.aktiviti),
+    mod,
     sesi_id: rekod.sesi_id ?? "",
     tarikh: rekod.tarikh ?? "",
     hari: rekod.hari ?? "ISNIN",
@@ -139,8 +143,8 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
     sk_tajuk: rekod.sk_tajuk ?? "",
     standard_pembelajaran: rekod.standard_pembelajaran,
     objektif: rekod.objektif.length ? rekod.objektif : ["", ""],
-    bbm: rekod.bbm ?? "",
-    nilai: rekod.nilai ?? NILAI_ASAL,
+    bbm: kosongkanBahan ? "" : (rekod.bbm ?? ""),
+    nilai: kosongkanBahan ? "" : (rekod.nilai ?? NILAI_ASAL),
     aktiviti: rekod.aktiviti.length ? rekod.aktiviti : ["", "", "", "", "", ""],
     refleksi_peratus: rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : "",
     refleksi_berjaya: bacaStatusRefleksi(rekod.refleksi_berjaya),
