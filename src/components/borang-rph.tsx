@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { tarikhUntukHari } from "@/lib/jadual/parse";
 import {
-  AKTIVITI_CUTI_ASAL,
   borangKosong,
   dariRekod,
+  muatAktivitiPeperiksaan,
   muatanSimpan,
-  OBJEKTIF_PEPERIKSAAN,
+  terapModRph,
   type BorangRphNilai,
   type ModRph,
 } from "@/lib/rph/borang";
@@ -184,27 +184,8 @@ export function BorangRph({
     const masa = ++janaMasa.current;
     setSedangJana(true);
     try {
-      const res = await fetch("/api/rph/generate-sesi", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          skop: "peperiksaan",
-          mata_pelajaran: asas.mata_pelajaran,
-          tingkatan: asas.tingkatan,
-          kelas: asas.kelas,
-          hari: asas.hari,
-          masa: asas.masa,
-        }),
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        ralat?: string;
-        aktiviti?: string[];
-        sandaran?: boolean;
-        sebab?: string;
-      };
+      const json = await muatAktivitiPeperiksaan(asas);
       if (masa !== janaMasa.current) return;
-      if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana aktiviti peperiksaan.");
       setBorang((current) =>
         current.mod === "peperiksaan"
           ? { ...current, aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti }
@@ -223,32 +204,15 @@ export function BorangRph({
     }
   }
 
-  function pilihMod(mod: ModRph) {
+  function pilihMod(mod: Exclude<ModRph, "pdpc">) {
     if (janaTunda.current) clearTimeout(janaTunda.current);
     if (mod === "cuti") {
       janaMasa.current += 1;
       setSedangJana(false);
-      setBorang((current) => ({
-        ...current,
-        mod,
-        sk_kod: "",
-        sk_tajuk: "",
-        standard_pembelajaran: [],
-        objektif: [],
-        bbm: "",
-        nilai: "",
-        aktiviti: [...AKTIVITI_CUTI_ASAL],
-      }));
+      setBorang((current) => terapModRph(current, "cuti"));
       return;
     }
-    const seterusnya: BorangRphNilai = {
-      ...borangRujukan.current,
-      mod,
-      sk_kod: "",
-      sk_tajuk: "",
-      standard_pembelajaran: [],
-      objektif: [...OBJEKTIF_PEPERIKSAAN],
-    };
+    const seterusnya = terapModRph(borangRujukan.current, "peperiksaan");
     setBorang(seterusnya);
     void janaPeperiksaan(seterusnya);
   }

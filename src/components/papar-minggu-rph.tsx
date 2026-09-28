@@ -9,7 +9,7 @@ import { ButangKongsiRph } from "@/components/butang-kongsi-rph";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
-import { dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
+import { dariRekod, muatAktivitiPeperiksaan, muatanSimpan, terapModRph, type BorangRphNilai } from "@/lib/rph/borang";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 import { bandingSesiRph, kumpulanMingguRph, type KumpulanMingguRph } from "@/lib/rph/tahun";
 import type { RphRekod } from "@/lib/rph/types";
@@ -28,6 +28,8 @@ export function PaparMingguRph() {
   const [sedangMuat, setSedangMuat] = useState(true);
   const [sedangSimpan, setSedangSimpan] = useState(false);
   const [sedangPdf, setSedangPdf] = useState(false);
+  const [sedangJana, setSedangJana] = useState<number | null>(null);
+  const janaToken = useRef<number[]>([]);
   const borangRujukan = useRef(borang);
   borangRujukan.current = borang;
 
@@ -75,6 +77,41 @@ export function PaparMingguRph() {
 
   function kemaskini(indeks: number, nilai: BorangRphNilai) {
     setBorang((senarai) => senarai.map((item, i) => (i === indeks ? nilai : item)));
+  }
+
+  async function pilihMod(indeks: number, mod: "peperiksaan" | "cuti") {
+    const semasa = borangRujukan.current[indeks];
+    if (!semasa) return;
+    const token = (janaToken.current[indeks] ?? 0) + 1;
+    janaToken.current[indeks] = token;
+    const asas = terapModRph(semasa, mod);
+    kemaskini(indeks, asas);
+    if (mod === "cuti") {
+      setSedangJana((nilai) => (nilai === indeks ? null : nilai));
+      return;
+    }
+    setSedangJana(indeks);
+    try {
+      const json = await muatAktivitiPeperiksaan(asas);
+      if (janaToken.current[indeks] !== token) return;
+      setBorang((senarai) =>
+        senarai.map((item, i) =>
+          i === indeks && item.mod === "peperiksaan"
+            ? { ...item, aktiviti: json.aktiviti?.length ? json.aktiviti : item.aktiviti }
+            : item
+        )
+      );
+      if (json.sandaran) {
+        toast.warning(json.sebab ?? "Gemini tidak dapat dihubungi. Aktiviti pengawasan sandaran digunakan.");
+      } else {
+        toast.success(`Aktiviti pengawasan peperiksaan dijana untuk sesi ${indeks + 1}.`);
+      }
+    } catch (error) {
+      if (janaToken.current[indeks] !== token) return;
+      toast.error(error instanceof Error ? error.message : "Gagal menjana aktiviti peperiksaan.");
+    } finally {
+      if (janaToken.current[indeks] === token) setSedangJana((nilai) => (nilai === indeks ? null : nilai));
+    }
   }
 
   async function simpanSemua() {
@@ -191,14 +228,41 @@ export function PaparMingguRph() {
       {borang.length ? (
         borang.map((item, indeks) => (
           <section key={item.id ?? `sesi-${indeks}`} className="space-y-2" id={`sesi-${indeks + 1}`}>
-            <h2 className="font-heading text-sm font-medium">
-              Sesi {indeks + 1} / {borang.length}
-              {item.hari ? ` · ${item.hari}` : ""}
-              {item.masa ? ` · ${item.masa}` : ""}
-              {item.mata_pelajaran ? ` · ${item.mata_pelajaran}` : ""}
-              {item.kelas ? ` · ${item.kelas}` : ""}
-            </h2>
-            <JadualRph borang={item} onChange={(nilai) => kemaskini(indeks, nilai)} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-heading text-sm font-medium">
+                Sesi {indeks + 1} / {borang.length}
+                {item.hari ? ` · ${item.hari}` : ""}
+                {item.masa ? ` · ${item.masa}` : ""}
+                {item.mata_pelajaran ? ` · ${item.mata_pelajaran}` : ""}
+                {item.kelas ? ` · ${item.kelas}` : ""}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={item.mod === "peperiksaan" ? "default" : "outline"}
+                  disabled={sedangJana === indeks}
+                  onClick={() => void pilihMod(indeks, "peperiksaan")}
+                >
+                  {sedangJana === indeks ? <Loader2 className="animate-spin" /> : null}
+                  Ujian/Peperiksaan
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={item.mod === "cuti" ? "default" : "outline"}
+                  disabled={sedangJana === indeks}
+                  onClick={() => void pilihMod(indeks, "cuti")}
+                >
+                  Cuti
+                </Button>
+              </div>
+            </div>
+            <JadualRph
+              borang={item}
+              sedangJana={sedangJana === indeks}
+              onChange={(nilai) => kemaskini(indeks, nilai)}
+            />
           </section>
         ))
       ) : (

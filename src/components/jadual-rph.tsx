@@ -339,6 +339,14 @@ export function JadualRph({
             <td className={cell} colSpan={5}>
               {bacaSahaja ? (
                 <p>{borang.bidang_nama || "—"}</p>
+              ) : borang.mod === "peperiksaan" || borang.mod === "cuti" ? (
+                <Input
+                  className={field}
+                  value={borang.bidang_nama}
+                  readOnly={borang.mod === "cuti"}
+                  placeholder={borang.mod === "peperiksaan" ? "UJIAN/PEPERIKSAAN" : "CUTI"}
+                  onChange={(event) => kemaskini({ bidang_nama: event.target.value })}
+                />
               ) : bidang.length ? (
                 <select
                   className={`${field} bg-white`}

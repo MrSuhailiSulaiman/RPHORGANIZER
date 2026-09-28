@@ -10,6 +10,58 @@ export const OBJEKTIF_PEPERIKSAAN = [
 
 export const AKTIVITI_CUTI_ASAL = ["SELAMAT BERCUTI", "CUTI SEMPENA : "];
 
+export function terapModRph(borang: BorangRphNilai, mod: Exclude<ModRph, "pdpc">): BorangRphNilai {
+  if (mod === "cuti") {
+    return {
+      ...borang,
+      mod,
+      bidang_kod: "",
+      bidang_nama: "CUTI",
+      sk_kod: "",
+      sk_tajuk: "",
+      standard_pembelajaran: [],
+      objektif: [],
+      bbm: "",
+      nilai: "",
+      aktiviti: [...AKTIVITI_CUTI_ASAL],
+    };
+  }
+  return {
+    ...borang,
+    mod,
+    bidang_kod: "",
+    bidang_nama: "UJIAN/PEPERIKSAAN",
+    sk_kod: "",
+    sk_tajuk: "",
+    standard_pembelajaran: [],
+    objektif: [...OBJEKTIF_PEPERIKSAAN],
+  };
+}
+
+export async function muatAktivitiPeperiksaan(borang: BorangRphNilai) {
+  const res = await fetch("/api/rph/generate-sesi", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      skop: "peperiksaan",
+      mata_pelajaran: borang.mata_pelajaran,
+      tingkatan: borang.tingkatan,
+      kelas: borang.kelas,
+      hari: borang.hari,
+      masa: borang.masa,
+    }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    ralat?: string;
+    aktiviti?: string[];
+    sandaran?: boolean;
+    sebab?: string;
+  };
+  if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana aktiviti peperiksaan.");
+  return json;
+}
+
 export function modDaripadaKandungan(objektif: string[], aktiviti: string[]): ModRph {
   const obj = objektif.map((item) => item.trim().toUpperCase());
   if (obj[0] === OBJEKTIF_PEPERIKSAAN[0] && obj[1] === OBJEKTIF_PEPERIKSAAN[1]) return "peperiksaan";
