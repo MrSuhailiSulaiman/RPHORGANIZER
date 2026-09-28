@@ -1,8 +1,26 @@
 import { bacaStatusRefleksi, STATUS_REFLEKSI_ASAL, type RphRekod, type RphStandard } from "./types";
 import type { SesiPdp } from "@/lib/jadual/types";
 
+export type ModRph = "pdpc" | "peperiksaan" | "cuti";
+
+export const OBJEKTIF_PEPERIKSAAN = [
+  "MEMASTIKAN MURID BERSEDIA UNTUK MENDUDUKI PEPERIKSAAN",
+  "MEMASTIKAN MURID TIDAK MENIRU ATAU TIDUR SEMASA MENDUDUKI PEPERIKSAAN",
+];
+
+export const AKTIVITI_CUTI_ASAL = ["SELAMAT BERCUTI", "CUTI SEMPENA : "];
+
+export function modDaripadaKandungan(objektif: string[], aktiviti: string[]): ModRph {
+  const obj = objektif.map((item) => item.trim().toUpperCase());
+  if (obj[0] === OBJEKTIF_PEPERIKSAAN[0] && obj[1] === OBJEKTIF_PEPERIKSAAN[1]) return "peperiksaan";
+  const pertama = (aktiviti[0] ?? "").trim().toUpperCase();
+  if (pertama === "SELAMAT BERCUTI") return "cuti";
+  return "pdpc";
+}
+
 export type BorangRphNilai = {
   id?: string;
+  mod: ModRph;
   sesi_id: string;
   tarikh: string;
   hari: string;
@@ -29,6 +47,7 @@ export const NILAI_ASAL = "PEMIKIR";
 export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
   const hari = sesi?.hari ?? "ISNIN";
   return {
+    mod: "pdpc",
     sesi_id: sesi?.id ?? "",
     tarikh: "",
     hari,
@@ -54,6 +73,7 @@ export function borangKosong(sesi?: SesiPdp | null): BorangRphNilai {
 export function dariRekod(rekod: RphRekod): BorangRphNilai {
   return {
     id: rekod.id,
+    mod: modDaripadaKandungan(rekod.objektif, rekod.aktiviti),
     sesi_id: rekod.sesi_id ?? "",
     tarikh: rekod.tarikh ?? "",
     hari: rekod.hari ?? "ISNIN",

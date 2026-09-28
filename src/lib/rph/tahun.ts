@@ -2,7 +2,7 @@ import { HARI_LIST } from "@/lib/jadual/types";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { KurikulumPilihan, RphStandard } from "./types";
 
-export const BIL_MINGGU_TAHUN = 40;
+export const BIL_MINGGU_TAHUN = 46;
 
 export type UnitKurikulum = {
   kunci: string;

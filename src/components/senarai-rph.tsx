@@ -271,7 +271,7 @@ export function SenaraiRph() {
         );
       }
       await muat();
-      toast.success(`${json.bil_rph ?? 0} RPH dijana untuk ${json.bil_minggu ?? 40} minggu.`);
+      toast.success(`${json.bil_rph ?? 0} RPH dijana untuk ${json.bil_minggu ?? BIL_MINGGU_TAHUN} minggu.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal menjana RPH.");
     } finally {

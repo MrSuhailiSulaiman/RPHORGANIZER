@@ -2,7 +2,9 @@ import { connection, NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { kunciGemini } from "@/lib/rph/kunci-padam";
 import {
+  aktivitiPeperiksaanSandaran,
   bahanSandaran,
+  janaAktivitiPeperiksaan,
   janaBahanSesi,
   janaObjektifSesi,
   pilihAktivitiUntukSesi,
@@ -47,6 +49,41 @@ export async function POST(request: Request) {
           }))
           .filter((item) => item.pernyataan)
       : [];
+
+    const hanyaPeperiksaan = String(body.skop ?? "").trim() === "peperiksaan";
+    if (hanyaPeperiksaan) {
+      const konteksUjian = {
+        mata_pelajaran: String(body.mata_pelajaran ?? "").trim(),
+        tingkatan: String(body.tingkatan ?? "").trim(),
+        kelas: String(body.kelas ?? "").trim(),
+        hari: String(body.hari ?? "").trim(),
+        masa: String(body.masa ?? "").trim(),
+      };
+      if (!kunci) {
+        return NextResponse.json(
+          {
+            aktiviti: aktivitiPeperiksaanSandaran(konteksUjian.mata_pelajaran, konteksUjian.kelas),
+            sandaran: true,
+            sebab: SEBAB_TIADA_KUNCI,
+          },
+          { headers: { "Cache-Control": "no-store" } }
+        );
+      }
+      try {
+        const aktiviti = await janaAktivitiPeperiksaan(konteksUjian, kunci);
+        return NextResponse.json({ aktiviti }, { headers: { "Cache-Control": "no-store" } });
+      } catch (error) {
+        const mesej = error instanceof Error ? error.message : "Gemini gagal menjana aktiviti pengawasan.";
+        return NextResponse.json(
+          {
+            aktiviti: aktivitiPeperiksaanSandaran(konteksUjian.mata_pelajaran, konteksUjian.kelas),
+            sandaran: true,
+            sebab: mesej,
+          },
+          { headers: { "Cache-Control": "no-store" } }
+        );
+      }
+    }
 
     if (!standard.length) {
       return NextResponse.json(

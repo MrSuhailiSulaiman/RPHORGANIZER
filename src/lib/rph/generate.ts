@@ -335,6 +335,53 @@ ${senaraiSp(sp)}
 ${arahanObjektifDaripadaSp(sp)}`;
 }
 
+const aktivitiPeperiksaanSchema = z.object({
+  aktiviti: z.array(z.string().min(20).max(400)).min(5).max(8),
+});
+
+export function aktivitiPeperiksaanSandaran(mata?: string, kelas?: string) {
+  const subjek = [mata?.trim(), kelas?.trim()].filter(Boolean).join(" ") || "peperiksaan";
+  return [
+    `Guru menyiapkan dewan dan kertas soalan ${subjek} sebelum murid masuk.`,
+    "Murid duduk di tempat yang ditetapkan dan meletakkan beg di hadapan kelas.",
+    "Guru menyemak kehadiran serta memastikan meja bersih daripada nota dan telefon.",
+    "Guru mengedarkan kertas soalan dan mengingatkan peraturan peperiksaan.",
+    "Murid menjawab soalan dalam masa yang ditetapkan tanpa meniru atau tidur.",
+    "Guru mengawas dari hadapan dan berjalan di antara barisan sepanjang peperiksaan.",
+    "Guru mengumpul semua kertas jawapan apabila masa tamat dan menyemak bilangan skrip.",
+  ];
+}
+
+export async function janaAktivitiPeperiksaan(
+  input: Pick<KonteksSesi, "mata_pelajaran" | "tingkatan" | "kelas" | "hari" | "masa">,
+  apiKey?: string
+): Promise<string[]> {
+  if (!(apiKey || hasGeminiKey())) return aktivitiPeperiksaanSandaran(input.mata_pelajaran, input.kelas);
+  const output = await janaObjek(
+    aktivitiPeperiksaanSchema,
+    `Anda guru pengawas peperiksaan sekolah Malaysia. Tulis dalam bahasa Melayu standard.
+
+Sesi:
+- Mata pelajaran: ${input.mata_pelajaran || "-"}
+- Tingkatan: ${input.tingkatan || "-"}
+- Kelas: ${input.kelas || "-"}
+- Hari: ${input.hari || "-"}
+- Masa: ${input.masa || "-"}
+
+Tulis 5 hingga 8 langkah aktiviti PENGAWASAN PEPERIKSAAN sahaja.
+Objektif sesi:
+- Memastikan murid bersedia menduduki peperiksaan.
+- Memastikan murid tidak meniru atau tidur semasa peperiksaan.
+
+Jangan tulis pengajaran, standard pembelajaran, atau objektif baharu.
+Setiap langkah 1-2 ayat: apa guru pengawas dan murid buat, dari persediaan dewan hingga kutipan skrip.`,
+    apiKey
+  );
+  const aktiviti = output?.aktiviti.map((item) => item.trim()).filter(Boolean) ?? [];
+  if (aktiviti.length < 5) throw new Error("Gemini tidak menghasilkan aktiviti pengawasan.");
+  return aktiviti;
+}
+
 export async function janaObjektifSesi(input: KonteksSesi, apiKey?: string): Promise<string[]> {
   const sp = tapisSp(input, apiKey);
   const output = await janaObjek(

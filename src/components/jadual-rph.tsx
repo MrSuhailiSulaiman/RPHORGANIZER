@@ -155,6 +155,7 @@ export function JadualRph({
 
   useEffect(() => {
     if (bacaSahaja) return;
+    if (borangRujukan.current.mod === "peperiksaan" || borangRujukan.current.mod === "cuti") return;
     const senarai = kurikulum?.bidang ?? [];
     if (!senarai.length) return;
     const current = borangRujukan.current;
@@ -190,7 +191,7 @@ export function JadualRph({
       sk_kod: sk.kod,
       sk_tajuk: gabungKodTajuk(sk.kod, sk.tajuk),
     });
-  }, [bacaSahaja, kurikulum, borang.id, borang.sk_kod, borang.sk_tajuk, borang.bidang_kod]);
+  }, [bacaSahaja, kurikulum, borang.id, borang.mod, borang.sk_kod, borang.sk_tajuk, borang.bidang_kod]);
 
   const skList = useMemo(() => {
     const pilih =
@@ -200,9 +201,10 @@ export function JadualRph({
     return pilih?.standard_kandungan ?? [];
   }, [bidang, borang.bidang_kod, borang.sk_kod, borang.sk_tajuk]);
   const spList = useMemo(() => {
+    if (borang.mod === "peperiksaan" || borang.mod === "cuti") return [];
     const pilih = skList.find((item) => samaKod(item.kod, borang.sk_kod)) ?? skList[0];
     return pilih?.standard_pembelajaran ?? [];
-  }, [skList, borang.sk_kod]);
+  }, [skList, borang.sk_kod, borang.mod]);
   const skDalamSenarai = skList.some((item) => samaKod(item.kod, borang.sk_kod));
   const bidangDalamSenarai = bidang.some((item) => samaKod(item.kod, borang.bidang_kod));
 
@@ -216,6 +218,7 @@ export function JadualRph({
   function pilihBidang(kod: string) {
     const item = bidang.find((row) => samaKod(row.kod, kod));
     kemaskini({
+      mod: "pdpc",
       bidang_kod: kod,
       bidang_nama: item ? gabungKodTajuk(item.kod, item.nama) : borang.bidang_nama,
       sk_kod: "",
@@ -227,6 +230,7 @@ export function JadualRph({
   function pilihSk(kod: string) {
     const item = skList.find((row) => samaKod(row.kod, kod));
     kemaskini({
+      mod: "pdpc",
       sk_kod: item?.kod || kod,
       sk_tajuk: item ? gabungKodTajuk(item.kod, item.tajuk) : borang.sk_tajuk,
       standard_pembelajaran: [],
@@ -368,6 +372,8 @@ export function JadualRph({
             <td className={cell} colSpan={5}>
               {bacaSahaja ? (
                 <p>{borang.sk_tajuk || borang.sk_kod || "—"}</p>
+              ) : borang.mod === "peperiksaan" || borang.mod === "cuti" ? (
+                <p className="text-slate-500">—</p>
               ) : skList.length ? (
                 <select
                   className={`${field} bg-white`}
@@ -413,6 +419,8 @@ export function JadualRph({
                 ) : (
                   <p className="text-slate-500">—</p>
                 )
+              ) : borang.mod === "peperiksaan" || borang.mod === "cuti" ? (
+                <p className="text-slate-500">—</p>
               ) : spList.length ? (
                 spList.map((sp) => (
                   <label key={sp.kod} className="flex items-start gap-2 text-sm">
@@ -460,8 +468,13 @@ export function JadualRph({
               {sedangJana ? (
                 <p className="flex items-center gap-2 text-xs text-slate-500">
                   <Loader2 className="size-3 animate-spin" />
-                  Gemini sedang menganalisis standard pembelajaran...
+                  {borang.mod === "peperiksaan"
+                    ? "Gemini sedang menulis aktiviti pengawasan peperiksaan..."
+                    : "Gemini sedang menganalisis standard pembelajaran..."}
                 </p>
+              ) : null}
+              {borang.mod === "cuti" && !borang.objektif.length ? (
+                <p className="text-slate-500">—</p>
               ) : null}
               {borang.objektif.map((item, index) => (
                 <Textarea

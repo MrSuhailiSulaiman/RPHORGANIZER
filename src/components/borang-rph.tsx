@@ -8,7 +8,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { tarikhUntukHari } from "@/lib/jadual/parse";
-import { borangKosong, dariRekod, muatanSimpan, type BorangRphNilai } from "@/lib/rph/borang";
+import {
+  AKTIVITI_CUTI_ASAL,
+  borangKosong,
+  dariRekod,
+  muatanSimpan,
+  OBJEKTIF_PEPERIKSAAN,
+  type BorangRphNilai,
+  type ModRph,
+} from "@/lib/rph/borang";
 import { hantarPadamRph } from "@/lib/rph/padam-pelayar";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 import { kumpulanMingguRph, rphMingguSemasa, type KumpulanMingguRph } from "@/lib/rph/tahun";
@@ -172,7 +180,88 @@ export function BorangRph({
     }
   }
 
+  async function janaPeperiksaan(asas: BorangRphNilai) {
+    const masa = ++janaMasa.current;
+    setSedangJana(true);
+    try {
+      const res = await fetch("/api/rph/generate-sesi", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skop: "peperiksaan",
+          mata_pelajaran: asas.mata_pelajaran,
+          tingkatan: asas.tingkatan,
+          kelas: asas.kelas,
+          hari: asas.hari,
+          masa: asas.masa,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ralat?: string;
+        aktiviti?: string[];
+        sandaran?: boolean;
+        sebab?: string;
+      };
+      if (masa !== janaMasa.current) return;
+      if (!res.ok) throw new Error(json.ralat ?? "Gagal menjana aktiviti peperiksaan.");
+      setBorang((current) =>
+        current.mod === "peperiksaan"
+          ? { ...current, aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti }
+          : current
+      );
+      if (json.sandaran) {
+        toast.warning(json.sebab ?? "Gemini tidak dapat dihubungi. Aktiviti pengawasan sandaran digunakan.");
+      } else {
+        toast.success("Aktiviti pengawasan peperiksaan dijana. Semak kemudian simpan.");
+      }
+    } catch (error) {
+      if (masa !== janaMasa.current) return;
+      toast.error(error instanceof Error ? error.message : "Gagal menjana aktiviti peperiksaan.");
+    } finally {
+      if (masa === janaMasa.current) setSedangJana(false);
+    }
+  }
+
+  function pilihMod(mod: ModRph) {
+    if (janaTunda.current) clearTimeout(janaTunda.current);
+    if (mod === "cuti") {
+      janaMasa.current += 1;
+      setSedangJana(false);
+      setBorang((current) => ({
+        ...current,
+        mod,
+        sk_kod: "",
+        sk_tajuk: "",
+        standard_pembelajaran: [],
+        objektif: [],
+        bbm: "",
+        nilai: "",
+        aktiviti: [...AKTIVITI_CUTI_ASAL],
+      }));
+      return;
+    }
+    const seterusnya: BorangRphNilai = {
+      ...borangRujukan.current,
+      mod,
+      sk_kod: "",
+      sk_tajuk: "",
+      standard_pembelajaran: [],
+      objektif: [...OBJEKTIF_PEPERIKSAAN],
+    };
+    setBorang(seterusnya);
+    void janaPeperiksaan(seterusnya);
+  }
+
   async function janaSesi(pilihan?: { standard?: RphStandard[]; skop?: "objektif" | "penuh" }) {
+    if (borangRujukan.current.mod === "cuti") {
+      toast.error("RPH cuti tidak dijana daripada standard pembelajaran.");
+      return;
+    }
+    if (borangRujukan.current.mod === "peperiksaan") {
+      void janaPeperiksaan(borangRujukan.current);
+      return;
+    }
     const standard = (pilihan?.standard ?? borang.standard_pembelajaran).filter((item) =>
       item.pernyataan.trim()
     );
@@ -261,10 +350,28 @@ export function BorangRph({
             if (id && id !== rphId) router.push(`/rph/${id}`);
           }}
         />
-        <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
-          {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          {sedangJana ? "Menjana RPH..." : "Generate RPH"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={borang.mod === "peperiksaan" ? "default" : "outline"}
+            onClick={() => pilihMod("peperiksaan")}
+            disabled={sedangJana}
+          >
+            Ujian/Peperiksaan
+          </Button>
+          <Button
+            type="button"
+            variant={borang.mod === "cuti" ? "default" : "outline"}
+            onClick={() => pilihMod("cuti")}
+            disabled={sedangJana}
+          >
+            Cuti
+          </Button>
+          <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
+            {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {sedangJana ? "Menjana RPH..." : "Generate RPH"}
+          </Button>
+        </div>
       </div>
       <JadualRph
         borang={borang}
