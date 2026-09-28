@@ -7,7 +7,7 @@ import { bahanSandaran, janaBahanKurikulum, pilihAktivitiUntukSesi } from "@/lib
 import { supabaseRuntimeConfig } from "@/lib/runtime-env";
 import { getSemuaKurikulum, padamSemuaRph, simpanRphPukal } from "@/lib/rph/save";
 import {
-  BIL_MINGGU_TAHUN,
+  BIL_MINGGU_SETAHUN,
   isninPadaAtauSelepas,
   kunciUnit,
   susunSlotTahun,
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     const tarikhMula = isninPadaAtauSelepas(body.tarikh_mula || tarikhMulaTahunAsal());
-    const slots = susunSlotTahun({ sesi, kurikulum, tarikhMula });
+    const slots = susunSlotTahun({ sesi, kurikulum, tarikhMula, bilMinggu: BIL_MINGGU_SETAHUN });
     if (!slots.some((item) => item.unit)) {
       return NextResponse.json(
         {
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       };
     });
 
-    const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_TAHUN, "JUMAAT");
+    const tarikhTamat = tarikhSlot(tarikhMula, BIL_MINGGU_SETAHUN, "JUMAAT");
     const cfg = supabaseRuntimeConfig();
     try {
       await padamSemuaRph(cfg, auth.sesi.id);
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       tarikh_mula: tarikhMula,
       tarikh_tamat: tarikhTamat,
-      bil_minggu: BIL_MINGGU_TAHUN,
+      bil_minggu: BIL_MINGGU_SETAHUN,
       bil_rph: bilangan,
     });
   } catch (error) {

@@ -6,6 +6,7 @@ import { kunciGemini } from "@/lib/rph/kunci-padam";
 import { bahanSandaran, janaBahanKurikulum, pilihAktivitiUntukSesi } from "@/lib/rph/generate";
 import { getSemuaKurikulum, padamRphDalamTempoh, simpanRphPukal } from "@/lib/rph/save";
 import {
+  BIL_MINGGU_SETAHUN,
   BIL_MINGGU_TAHUN,
   isninPadaAtauSelepas,
   kunciUnit,
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
       sesi,
       kurikulum,
       tarikhMula: isnin,
-      bilMinggu: BIL_MINGGU_TAHUN,
+      bilMinggu: minggu <= BIL_MINGGU_SETAHUN ? BIL_MINGGU_SETAHUN : BIL_MINGGU_TAHUN,
     });
     const slots = semua
       .filter((slot) => slot.minggu === minggu)

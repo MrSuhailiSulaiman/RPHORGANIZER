@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { HARI_LIST } from "@/lib/jadual/parse";
 import type { SesiPdp } from "@/lib/jadual/types";
 import type { RphRekod } from "@/lib/rph/types";
-import { BIL_MINGGU_TAHUN, isninPadaAtauSelepas, kumpulanMingguRph, mingguSemasaDalam, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
+import { BIL_MINGGU_SETAHUN, BIL_MINGGU_TAHUN, isninPadaAtauSelepas, kumpulanMingguRph, mingguSemasaDalam, tarikhMulaTahunAsal } from "@/lib/rph/tahun";
 import {
   Dialog,
   DialogContent,
@@ -271,7 +271,7 @@ export function SenaraiRph() {
         );
       }
       await muat();
-      toast.success(`${json.bil_rph ?? 0} RPH dijana untuk ${json.bil_minggu ?? BIL_MINGGU_TAHUN} minggu.`);
+      toast.success(`${json.bil_rph ?? 0} RPH dijana untuk ${json.bil_minggu ?? BIL_MINGGU_SETAHUN} minggu.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal menjana RPH.");
     } finally {
@@ -286,7 +286,7 @@ export function SenaraiRph() {
           <CardHeader>
             <CardTitle>Jana RPH setahun</CardTitle>
             <CardDescription>
-              Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
+              Menjana RPH untuk {BIL_MINGGU_SETAHUN} minggu. Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
@@ -328,7 +328,7 @@ export function SenaraiRph() {
         <CardHeader>
           <CardTitle>Jana RPH setahun</CardTitle>
           <CardDescription>
-            Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
+            Menjana RPH untuk {BIL_MINGGU_SETAHUN} minggu. Gemini membahagi setiap Standard Pembelajaran secara sekata, menulis objektif, kemudian aktiviti yang selari dengan objektif itu. Kaedah bertukar antara Koperatif, Berasaskan Masalah, Inkuiri, Berasaskan Projek, dan Masteri.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
