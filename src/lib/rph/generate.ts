@@ -339,30 +339,50 @@ const aktivitiPeperiksaanSchema = z.object({
   aktiviti: z.array(z.string().min(20).max(400)).min(5).max(8),
 });
 
-export function aktivitiPeperiksaanSandaran(mata?: string, kelas?: string) {
-  const subjek = [mata?.trim(), kelas?.trim()].filter(Boolean).join(" ") || "peperiksaan";
+export function aktivitiPeperiksaanSandaran() {
   return [
-    `Guru menyiapkan dewan dan kertas soalan ${subjek} sebelum murid masuk.`,
+    "Guru menyiapkan dewan dan kertas soalan sebelum murid masuk.",
     "Murid duduk di tempat yang ditetapkan dan meletakkan beg di hadapan kelas.",
     "Guru menyemak kehadiran serta memastikan meja bersih daripada nota dan telefon.",
-    "Guru mengedarkan kertas soalan dan mengingatkan peraturan peperiksaan.",
+    "Guru pengawas mengedarkan kertas soalan.",
     "Murid menjawab soalan dalam masa yang ditetapkan tanpa meniru atau tidur.",
     "Guru mengawas dari hadapan dan berjalan di antara barisan sepanjang peperiksaan.",
     "Guru mengumpul semua kertas jawapan apabila masa tamat dan menyemak bilangan skrip.",
   ];
 }
 
+function bersihAktivitiPeperiksaan(aktiviti: string[], mata?: string) {
+  const nama = mata?.trim();
+  const namaRe = nama ? new RegExp(`\\b${nama.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi") : null;
+  const nampakKertas = new Set<string>();
+  const hasil: string[] = [];
+  for (const item of aktiviti) {
+    if (/mengedar(?:kan)?\s+kertas\s+soalan/i.test(item)) {
+      const tetap = "Guru pengawas mengedarkan kertas soalan.";
+      if (nampakKertas.has(tetap)) continue;
+      nampakKertas.add(tetap);
+      hasil.push(tetap);
+      continue;
+    }
+    let teks = item;
+    if (namaRe) teks = teks.replace(namaRe, "");
+    teks = teks.replace(/\bmata\s+pelajaran\b/gi, "");
+    teks = teks.replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
+    if (teks.length >= 20) hasil.push(teks);
+  }
+  return hasil;
+}
+
 export async function janaAktivitiPeperiksaan(
   input: Pick<KonteksSesi, "mata_pelajaran" | "tingkatan" | "kelas" | "hari" | "masa">,
   apiKey?: string
 ): Promise<string[]> {
-  if (!(apiKey || hasGeminiKey())) return aktivitiPeperiksaanSandaran(input.mata_pelajaran, input.kelas);
+  if (!(apiKey || hasGeminiKey())) return aktivitiPeperiksaanSandaran();
   const output = await janaObjek(
     aktivitiPeperiksaanSchema,
     `Anda guru pengawas peperiksaan sekolah Malaysia. Tulis dalam bahasa Melayu standard.
 
 Sesi:
-- Mata pelajaran: ${input.mata_pelajaran || "-"}
 - Tingkatan: ${input.tingkatan || "-"}
 - Kelas: ${input.kelas || "-"}
 - Hari: ${input.hari || "-"}
@@ -374,10 +394,15 @@ Objektif sesi:
 - Memastikan murid tidak meniru atau tidur semasa peperiksaan.
 
 Jangan tulis pengajaran, standard pembelajaran, atau objektif baharu.
+Jangan sebut nama mata pelajaran dan jangan tulis frasa "Mata Pelajaran" pada mana-mana langkah.
+Langkah mengedar kertas mesti hanya menyatakan bahawa guru pengawas mengedarkan kertas soalan. Jangan namakan subjek pada kertas itu.
 Setiap langkah 1-2 ayat: apa guru pengawas dan murid buat, dari persediaan dewan hingga kutipan skrip.`,
     apiKey
   );
-  const aktiviti = output?.aktiviti.map((item) => item.trim()).filter(Boolean) ?? [];
+  const aktiviti = bersihAktivitiPeperiksaan(
+    output?.aktiviti.map((item) => item.trim()).filter(Boolean) ?? [],
+    input.mata_pelajaran
+  );
   if (aktiviti.length < 5) throw new Error("Gemini tidak menghasilkan aktiviti pengawasan.");
   return aktiviti;
 }

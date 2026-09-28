@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       if (!kunci) {
         return NextResponse.json(
           {
-            aktiviti: aktivitiPeperiksaanSandaran(konteksUjian.mata_pelajaran, konteksUjian.kelas),
+            aktiviti: aktivitiPeperiksaanSandaran(),
             sandaran: true,
             sebab: SEBAB_TIADA_KUNCI,
           },
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         const mesej = error instanceof Error ? error.message : "Gemini gagal menjana aktiviti pengawasan.";
         return NextResponse.json(
           {
-            aktiviti: aktivitiPeperiksaanSandaran(konteksUjian.mata_pelajaran, konteksUjian.kelas),
+            aktiviti: aktivitiPeperiksaanSandaran(),
             sandaran: true,
             sebab: mesej,
           },
