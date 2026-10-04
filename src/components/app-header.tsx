@@ -5,15 +5,8 @@ import { usePathname } from "next/navigation";
 import { BookMarked, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButangKeluarPadat, pautanAktif, senaraiNav, sorokNavigasi } from "@/components/navigasi-peranti";
 import { cn } from "@/lib/utils";
-
-const NAV = [
-  { href: "/", label: "DSKP" },
-  { href: "/muat-naik", label: "Muat naik" },
-  { href: "/jadual-waktu", label: "Jadual waktu" },
-  { href: "/rph", label: "Borang RPH" },
-  { href: "/panduan", label: "Panduan" },
-];
 
 export function AppHeader({
   pengguna,
@@ -21,16 +14,14 @@ export function AppHeader({
   pengguna?: { nama: string; peranan: string } | null;
 }) {
   const pathname = usePathname();
-  const halamanAuth = pathname === "/masuk";
-  const halamanKongsi = pathname.startsWith("/kongsi");
-  const nav =
-    pengguna?.peranan === "admin" ? [...NAV, { href: "/pengguna", label: "Senarai pengguna" }] : NAV;
+  const sorok = sorokNavigasi(pathname, Boolean(pengguna));
+  const nav = senaraiNav(pengguna?.peranan);
 
   return (
-    <header className="border-b bg-card/80 backdrop-blur">
+    <header className={cn("border-b bg-card/80 backdrop-blur", sorok ? "" : "md:hidden xl:block")}>
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5">
         <Link
-          href={halamanAuth || (halamanKongsi && !pengguna) ? "/masuk" : "/"}
+          href={sorok ? "/masuk" : "/"}
           className="flex shrink-0 items-center gap-2 font-heading text-sm font-semibold tracking-tight"
         >
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -41,12 +32,11 @@ export function AppHeader({
             <span className="ml-2 font-normal text-muted-foreground">DSKP</span>
           </span>
         </Link>
-        {halamanAuth || (halamanKongsi && !pengguna) ? null : (
+        {sorok ? null : (
           <>
-            <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+            <nav className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 xl:flex">
               {nav.map((item) => {
-                const active =
-                  pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
+                const active = pautanAktif(pathname, item.href);
                 return (
                   <Link
                     key={item.href}
@@ -64,14 +54,17 @@ export function AppHeader({
               })}
             </nav>
             {pengguna ? (
-              <div className="flex shrink-0 items-center gap-3 border-l border-border pl-4">
-                <div className="flex items-center gap-2">
+              <div className="ml-auto flex shrink-0 items-center gap-3 xl:border-l xl:border-border xl:pl-4">
+                <div className="hidden items-center gap-2 xl:flex">
                   <span className="text-sm font-medium uppercase">{pengguna.nama}</span>
                   <Badge variant={pengguna.peranan === "admin" ? "default" : "secondary"}>
                     {pengguna.peranan === "admin" ? "Admin" : "Pengguna Biasa"}
                   </Badge>
                 </div>
-                <form action="/api/auth/keluar" method="post">
+                <span className="xl:hidden">
+                  <ButangKeluarPadat />
+                </span>
+                <form action="/api/auth/keluar" method="post" className="hidden xl:block">
                   <Button type="submit" variant="ghost" size="sm">
                     <LogOut />
                     Log keluar

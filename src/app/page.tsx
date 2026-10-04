@@ -15,15 +15,15 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Dokumen DSKP</h1>
+          <h1 className="font-heading text-xl font-semibold tracking-tight md:text-2xl">Dokumen DSKP</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Simpan Bidang Pembelajaran, Standard Kandungan, dan Standard Pembelajaran daripada PDF
             rasmi KSSM.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/muat-naik">
             <Upload />
             Muat naik DSKP
@@ -58,7 +58,26 @@ export default async function HomePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <>
+        <ul className="divide-y overflow-hidden rounded-lg border bg-card md:hidden">
+          {dokumen.map((item) => (
+            <li key={item.id}>
+              <Link href={`/dskp/${item.id}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{item.mata_pelajaran ?? "DSKP"}</span>
+                  <span className="block text-xs text-muted-foreground">{item.tingkatan || "—"}</span>
+                </span>
+                <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                  {item.bil_bidang} bidang
+                  <span className="block">
+                    {item.bil_sk} SK · {item.bil_sp} SP
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-hidden rounded-lg border bg-card md:block">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -90,6 +109,7 @@ export default async function HomePage() {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
     </div>
   );
