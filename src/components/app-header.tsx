@@ -27,10 +27,7 @@ export function AppHeader({
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <BookMarked className="size-4" />
           </span>
-          <span>
-            e-RPH
-            <span className="ml-2 font-normal text-muted-foreground">DSKP</span>
-          </span>
+          <span>RPH Organizer</span>
         </Link>
         {sorok ? null : (
           <>

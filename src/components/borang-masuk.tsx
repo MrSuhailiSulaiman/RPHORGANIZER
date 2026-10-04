@@ -42,7 +42,7 @@ export function BorangMasuk() {
   return (
     <Card className="mx-auto w-full max-w-md">
       <CardHeader>
-        <CardTitle>Log masuk e-RPH</CardTitle>
+        <CardTitle>Log masuk RPH Organizer</CardTitle>
         <CardDescription>Log masuk dengan akaun yang diberikan oleh admin.</CardDescription>
       </CardHeader>
       <CardContent>

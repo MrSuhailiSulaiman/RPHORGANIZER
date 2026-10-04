@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "e-RPH · DSKP",
+  title: "RPH Organizer",
   description: "Simpan Bidang Pembelajaran, Standard Kandungan dan Standard Pembelajaran daripada PDF DSKP KSSM.",
 };
 

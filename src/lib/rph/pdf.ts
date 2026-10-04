@@ -297,7 +297,7 @@ export async function binaPdfRphMinggu(params: {
   const rekod = susunSesi(params.rekod);
   const doc = await PDFDocument.create();
   doc.setTitle(`RPH Minggu ${params.minggu}`);
-  doc.setAuthor("e-RPH");
+  doc.setAuthor("RPH Organizer");
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const tebal = await doc.embedFont(StandardFonts.HelveticaBold);
   const pelukis = new Pelukis(doc, font, tebal);

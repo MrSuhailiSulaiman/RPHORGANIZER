@@ -113,7 +113,7 @@ export function NavigasiTablet({
         <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <BookMarked className="size-4" />
         </span>
-        e-RPH
+        RPH Organizer
       </Link>
       <nav aria-label="Navigasi tablet" className="flex flex-1 flex-col gap-1 px-3">
         {nav.map((item) => {
