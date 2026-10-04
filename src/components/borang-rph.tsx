@@ -153,26 +153,24 @@ export function BorangRph({
     }
   }
 
-  async function muatPdfMinggu() {
+  async function muatPdfSesi() {
     if (sedangPdf) return;
-    const kumpul =
-      navMinggu ??
-      kumpulanMinggu.find((item) => item.item.some((row) => row.id === borang.id)) ??
-      kumpulanMinggu[0];
-    const ids = (kumpul?.item.map((item) => item.id) ?? []).filter(Boolean);
-    if (!kumpul || !ids.length) {
-      toast.error("Tiada sesi RPH pada minggu ini.");
+    if (!borang.id) {
+      toast.error("Simpan RPH ini dahulu sebelum dimuat turun.");
       return;
     }
+    const kumpul =
+      navMinggu ?? kumpulanMinggu.find((item) => item.item.some((row) => row.id === borang.id));
     setSedangPdf(true);
     try {
       await muatTurunPdfMinggu({
-        ids,
-        minggu: kumpul.minggu,
-        tarikh_mula: kumpul.tarikh_mula,
-        tarikh_tamat: kumpul.tarikh_tamat,
+        ids: [borang.id],
+        minggu: kumpul?.minggu ?? 1,
+        tarikh_mula: kumpul?.tarikh_mula,
+        tarikh_tamat: kumpul?.tarikh_tamat,
+        satu: true,
       });
-      toast.success(`PDF RPH Minggu ${kumpul.minggu} dimuat turun.`);
+      toast.success("PDF RPH yang dibuka dimuat turun.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal memuat turun PDF RPH.");
     } finally {
@@ -360,8 +358,8 @@ export function BorangRph({
         <Button
           type="button"
           variant="outline"
-          onClick={() => void muatPdfMinggu()}
-          disabled={sedangPdf || !(navMinggu?.item.length || kumpulanMinggu.length)}
+          onClick={() => void muatPdfSesi()}
+          disabled={sedangPdf || !borang.id}
         >
           {sedangPdf ? <Loader2 className="animate-spin" /> : <Download />}
           Download RPH

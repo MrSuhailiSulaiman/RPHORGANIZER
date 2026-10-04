@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { wajibSesi } from "@/lib/auth/penjaga";
 import { getPengguna } from "@/lib/auth/pengguna";
-import { binaPdfRphMinggu, namaFailPdfMinggu } from "@/lib/rph/pdf";
+import { binaPdfRphMinggu, namaFailPdfMinggu, namaFailPdfSesi } from "@/lib/rph/pdf";
 import { getRphMengikutId } from "@/lib/rph/save";
 
 export const runtime = "nodejs";
@@ -28,12 +28,17 @@ export async function POST(request: Request) {
       tarikh_mula?: unknown;
       tarikh_tamat?: unknown;
       pengguna_id?: unknown;
+      satu?: unknown;
     };
+    const satu = body.satu === true;
     const ids = (Array.isArray(body.ids) ? body.ids : [])
       .map((id) => String(id).trim())
       .filter(Boolean);
     if (!ids.length) {
       return json({ ralat: "Pilih sekurang-kurangnya satu sesi RPH untuk dimuat turun." }, 400);
+    }
+    if (satu && ids.length !== 1) {
+      return json({ ralat: "Muat turun sesi ini memerlukan satu RPH sahaja." }, 400);
     }
     let pemilikId = auth.sesi.id;
     let namaPengguna = auth.sesi.nama;
@@ -53,8 +58,8 @@ export async function POST(request: Request) {
     }
     const minggu = Number(body.minggu);
     const nomborMinggu = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
-    const pdf = await binaPdfRphMinggu({ rekod, minggu: nomborMinggu });
-    const nama = namaFailPdfMinggu(nomborMinggu, namaPengguna);
+    const pdf = await binaPdfRphMinggu({ rekod, minggu: nomborMinggu, satu });
+    const nama = satu ? namaFailPdfSesi(rekod[0], namaPengguna) : namaFailPdfMinggu(nomborMinggu, namaPengguna);
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {

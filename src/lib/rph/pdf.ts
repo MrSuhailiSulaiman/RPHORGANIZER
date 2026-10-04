@@ -109,15 +109,27 @@ function senaraiNombor(nilai: string[]) {
     .join("\n");
 }
 
-export function namaFailPdfMinggu(minggu: number, namaPengguna?: string | null) {
-  const nombor = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
-  const nama = (namaPengguna ?? "")
+function namaFailBersih(nilai: string) {
+  return nilai
     .trim()
     .toUpperCase()
     .replace(/[<>:"/\\|?*]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim() || "PENGGUNA";
+    .trim();
+}
+
+export function namaFailPdfMinggu(minggu: number, namaPengguna?: string | null) {
+  const nombor = Number.isFinite(minggu) && minggu > 0 ? Math.floor(minggu) : 1;
+  const nama = namaFailBersih(namaPengguna ?? "") || "PENGGUNA";
   return `M${nombor} - ${nama}.pdf`;
+}
+
+export function namaFailPdfSesi(rekod: RphRekod, namaPengguna?: string | null) {
+  const bahagian = [rekod.tarikh, rekod.hari, rekod.mata_pelajaran, rekod.kelas]
+    .map((item) => namaFailBersih(item ?? ""))
+    .filter(Boolean);
+  const nama = namaFailBersih(namaPengguna ?? "") || "PENGGUNA";
+  return `${bahagian.join(" - ") || "RPH"} - ${nama}.pdf`;
 }
 
 class Pelukis {
@@ -224,14 +236,22 @@ class Pelukis {
   }
 }
 
-function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: number, minggu: number) {
+function lukisSesi(
+  pelukis: Pelukis,
+  rekod: RphRekod,
+  indeks: number,
+  jumlah: number,
+  minggu: number,
+  satu = false
+) {
   pelukis.pastikan(120);
   pelukis.y -= 4;
   pelukis.teksTengah("RANCANGAN PENGAJARAN HARIAN", 13, pelukis.tebal, pelukis.y - 12);
   pelukis.y -= 18;
   const tarikh = [rekod.tarikh, rekod.hari].filter(Boolean).join(" · ");
+  const kedudukan = satu ? "" : `Sesi ${indeks + 1} / ${jumlah}`;
   pelukis.teksTengah(
-    `Minggu ${minggu} · Sesi ${indeks + 1} / ${jumlah}${tarikh ? ` · ${tarikh}` : ""}`,
+    [`Minggu ${minggu}`, kedudukan, tarikh].filter(Boolean).join(" · "),
     8,
     pelukis.font,
     pelukis.y - 8
@@ -293,10 +313,14 @@ function lukisSesi(pelukis: Pelukis, rekod: RphRekod, indeks: number, jumlah: nu
 export async function binaPdfRphMinggu(params: {
   rekod: RphRekod[];
   minggu: number;
+  satu?: boolean;
 }) {
-  const rekod = susunSesi(params.rekod);
+  const rekod = params.satu ? params.rekod.slice(0, 1) : susunSesi(params.rekod);
   const doc = await PDFDocument.create();
-  doc.setTitle(`RPH Minggu ${params.minggu}`);
+  const tajuk = params.satu
+    ? ["RPH", rekod[0]?.mata_pelajaran, rekod[0]?.tarikh].filter(Boolean).join(" ")
+    : `RPH Minggu ${params.minggu}`;
+  doc.setTitle(tajuk);
   doc.setAuthor("RPH Organizer");
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const tebal = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -304,7 +328,7 @@ export async function binaPdfRphMinggu(params: {
 
   rekod.forEach((item, indeks) => {
     if (indeks > 0) pelukis.mukaBaru();
-    lukisSesi(pelukis, item, indeks, rekod.length, params.minggu);
+    lukisSesi(pelukis, item, indeks, rekod.length, params.minggu, params.satu);
   });
 
   return doc.save();
