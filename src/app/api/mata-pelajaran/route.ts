@@ -92,6 +92,58 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  const auth = await wajibSesi();
+  if (auth.ralat) return auth.ralat;
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ralat: "Supabase belum dikonfigurasi." }, { status: 500 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { id?: string; kod?: string; nama?: string };
+  const id = String(body.id ?? "").trim();
+  const kod = String(body.kod ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  const nama = String(body.nama ?? "").replace(/\s+/g, " ").trim();
+  if (!id) {
+    return NextResponse.json({ ralat: "Mata pelajaran tidak dijumpai." }, { status: 400 });
+  }
+  if (!/^[A-Z0-9]{2,12}$/.test(kod)) {
+    return NextResponse.json({ ralat: "Kod mesti 2–12 huruf atau nombor. Contoh: SK atau GEO." }, { status: 400 });
+  }
+  if (nama.length < 2) {
+    return NextResponse.json({ ralat: "Nama mata pelajaran diperlukan." }, { status: 400 });
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data: sedia, error: ralatCari } = await supabase.from("mata_pelajaran").select("id, kod, nama");
+    if (ralatCari) throw new Error(ralatCari.message);
+    const konflik = (sedia ?? []).find(
+      (row) =>
+        row.id !== id &&
+        (String(row.kod ?? "").toUpperCase() === kod ||
+          String(row.nama ?? "").trim().toLowerCase() === nama.toLowerCase())
+    );
+    if (konflik) {
+      return NextResponse.json({ ralat: "Kod atau nama itu sudah digunakan oleh mata pelajaran lain." }, { status: 409 });
+    }
+
+    const { data, error } = await supabase
+      .from("mata_pelajaran")
+      .update({ kod, nama })
+      .eq("id", id)
+      .select("id, kod, nama")
+      .single();
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ mata_pelajaran: data });
+  } catch (error) {
+    const mesej = error instanceof Error ? error.message : "Gagal mengemaskini mata pelajaran.";
+    return NextResponse.json({ ralat: mesejKolumKod(mesej) }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   const auth = await wajibSesi();
   if (auth.ralat) return auth.ralat;
