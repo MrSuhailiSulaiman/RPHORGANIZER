@@ -57,8 +57,8 @@ export default function PanduanPage() {
               Jika sudah ada, terus ke langkah 2. DSKP dikongsi — anda tidak perlu muat naik semula.
             </li>
             <li>
-              Jika <strong className="text-foreground">tidak tersenarai</strong>, buka{" "}
-              <strong className="text-foreground">Muat naik</strong>.
+              Jika <strong className="text-foreground">tidak tersenarai</strong>, klik butang{" "}
+              <strong className="text-foreground">Muat naik DSKP</strong> pada halaman DSKP.
             </li>
             <li>
               Isi <strong className="text-foreground">Mata pelajaran</strong> (contoh Sains Komputer)
@@ -141,7 +141,7 @@ export default function PanduanPage() {
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <ol className="list-decimal space-y-3 pl-5">
             <li>
-              Buka menu <strong className="text-foreground">Borang RPH</strong>.
+              Buka menu <strong className="text-foreground">Senarai RPH</strong>.
             </li>
             <li>
               Pada kad <strong className="text-foreground">Jana RPH setahun</strong>, pilih{" "}
@@ -169,7 +169,7 @@ export default function PanduanPage() {
           <Button asChild size="sm">
             <Link href="/rph">
               <ClipboardList />
-              Buka Borang RPH
+              Buka Senarai RPH
             </Link>
           </Button>
         </CardContent>

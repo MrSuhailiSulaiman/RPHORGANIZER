@@ -9,7 +9,6 @@ import {
   CircleHelp,
   ClipboardList,
   LogOut,
-  Upload,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -26,9 +25,8 @@ export type PautanNav = {
 
 const NAV: PautanNav[] = [
   { href: "/", label: "DSKP", ringkas: "DSKP", icon: BookOpen },
-  { href: "/muat-naik", label: "Muat naik", ringkas: "Muat naik", icon: Upload },
   { href: "/jadual-waktu", label: "Jadual waktu", ringkas: "Jadual", icon: CalendarDays },
-  { href: "/rph", label: "Borang RPH", ringkas: "RPH", icon: ClipboardList },
+  { href: "/rph", label: "Senarai RPH", ringkas: "Senarai RPH", icon: ClipboardList },
   { href: "/panduan", label: "Panduan", ringkas: "Panduan", icon: CircleHelp },
 ];
 
@@ -84,12 +82,14 @@ export function NavigasiTelefon({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-1 py-2 text-[10px] leading-tight",
-                aktif ? "font-medium text-primary" : "text-muted-foreground"
+                "mx-0.5 my-1.5 flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 text-center text-[10px] font-medium leading-tight",
+                aktif
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground"
               )}
             >
               <Ikon className="size-5" />
-              <span className="truncate">{item.ringkas}</span>
+              <span>{item.ringkas}</span>
             </Link>
           );
         })}
@@ -124,8 +124,10 @@ export function NavigasiTablet({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
-                aktif ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60"
+                "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium",
+                aktif
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground hover:bg-muted"
               )}
             >
               <Ikon className="size-4" />

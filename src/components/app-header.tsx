@@ -34,7 +34,7 @@ export function AppHeader({
         </Link>
         {sorok ? null : (
           <>
-            <nav className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 xl:flex">
+            <nav className="hidden min-w-0 flex-1 flex-wrap items-center gap-1.5 xl:flex">
               {nav.map((item) => {
                 const active = pautanAktif(pathname, item.href);
                 return (
@@ -42,10 +42,10 @@ export function AppHeader({
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors",
+                      "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
                       active
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-muted"
                     )}
                   >
                     {item.label}
