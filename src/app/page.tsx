@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { BookOpen, Upload } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { senaraiDokumen } from "@/lib/dskp/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -58,25 +58,37 @@ export default async function HomePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {dokumen.map((item) => (
-            <Link key={item.id} href={`/dskp/${item.id}`}>
-              <Card className="h-full transition-colors hover:bg-muted/30">
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {item.mata_pelajaran ?? "DSKP"} {item.tingkatan ? `· ${item.tingkatan}` : ""}
-                  </CardTitle>
-                  <CardDescription>{item.nama_fail}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{item.bil_bidang} bidang</Badge>
-                  <Badge variant="secondary">{item.bil_sk} SK</Badge>
-                  <Badge variant="secondary">{item.bil_sp} SP</Badge>
-                  {item.tahun_terbitan ? <Badge variant="outline">{item.tahun_terbitan}</Badge> : null}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4 text-xs font-medium text-muted-foreground">Mata pelajaran</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Tingkatan</TableHead>
+                <TableHead className="text-right text-xs font-medium text-muted-foreground">Bidang</TableHead>
+                <TableHead className="text-right text-xs font-medium text-muted-foreground">SK</TableHead>
+                <TableHead className="text-right text-xs font-medium text-muted-foreground">SP</TableHead>
+                <TableHead className="pr-4 text-right text-xs font-medium text-muted-foreground">Tahun</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dokumen.map((item) => (
+                <TableRow key={item.id} className="relative">
+                  <TableCell className="pl-4 font-medium">
+                    <Link href={`/dskp/${item.id}`} className="after:absolute after:inset-0">
+                      {item.mata_pelajaran ?? "DSKP"}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{item.tingkatan || "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{item.bil_bidang}</TableCell>
+                  <TableCell className="text-right tabular-nums">{item.bil_sk}</TableCell>
+                  <TableCell className="text-right tabular-nums">{item.bil_sp}</TableCell>
+                  <TableCell className="pr-4 text-right tabular-nums text-muted-foreground">
+                    {item.tahun_terbitan || "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
