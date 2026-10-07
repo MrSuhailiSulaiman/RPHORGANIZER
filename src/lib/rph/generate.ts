@@ -3,6 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { geminiApiKey } from "@/lib/runtime-env";
 import type { KurikulumPilihan } from "./types";
+import { ringkasBbm } from "./bbm";
 import { kunciUnit, type UnitKurikulum } from "./tahun";
 
 export type BahanRph = {
@@ -497,7 +498,7 @@ Pilih bentuk yang sesuai dengan objektif, contohnya:
 
 Setiap langkah 1-2 ayat: apa murid buat, bahan yang digunakan, dan bagaimana hasilnya disemak terhadap objektif.
 Jangan ulang ayat objektif sebagai aktiviti.
-bbm: senaraikan bahan ulang kaji yang digunakan, seperti kertas soalan topikal atau kertas percubaan negeri.`,
+bbm: senarai pendek nama bahan sahaja, dipisah koma. Contoh: Kertas soalan topikal, kertas percubaan negeri. Jangan tulis ayat atau huraian.`,
       apiKey
     );
     const aktiviti = bersihAktiviti(output?.aktiviti);
@@ -505,7 +506,7 @@ bbm: senaraikan bahan ulang kaji yang digunakan, seperti kertas soalan topikal a
     return {
       objektif,
       aktiviti,
-      bbm: output?.bbm.trim() || bbmUlangkajiSandaran(),
+      bbm: ringkasBbm(output?.bbm ?? "") || bbmUlangkajiSandaran(),
       sandaran: Boolean(sebabObjektif),
       sebab: sebabObjektif || undefined,
     };
@@ -548,7 +549,7 @@ ${arahanAktivitiDaripadaObjektif(kaedah, masteri)}
 Tugas tambahan:
 1. objektif: ikut arahan analisis di atas.
 2. aktiviti: 5-8 langkah yang benar-benar mencerminkan kaedah pembelajaran yang dipilih.
-3. bbm: bahan realistik di sekolah Malaysia, sepadan dengan kaedah itu.
+3. bbm: senarai pendek nama bahan sahaja, dipisah koma. Maksimum lima bahan. Jangan tulis ayat atau huraian.
 4. nilai: satu nilai murni KSSM (contoh PEMIKIR, PRIHATIN, AMANAH).
 
 Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
@@ -558,7 +559,7 @@ Jangan ulang ayat standard pembelajaran sebagai aktiviti.`,
   if (!output) throw new Error("Gemini tidak menghasilkan objektif dan aktiviti.");
   return {
     objektif: pastikanKodDalamObjektif(output.objektif, sp),
-    bbm: output.bbm.trim(),
+    bbm: ringkasBbm(output.bbm),
     nilai: (output.nilai || "PEMIKIR").trim(),
     aktiviti: ikatAktivitiPadaObjektif(
       pastikanKodDalamObjektif(output.objektif, sp),
@@ -692,7 +693,7 @@ function petaDariGemini(item: {
   );
   return {
     objektif,
-    bbm: item.bbm,
+    bbm: ringkasBbm(item.bbm),
     nilai: item.nilai || "PEMIKIR",
     aktiviti: variasi[0] ?? [],
     variasi,
@@ -751,7 +752,7 @@ Untuk SETIAP sk_kod:
    Medan kaedah mesti menyalin nama itu tepat. Setiap set 5-8 langkah yang mencerminkan ciri kaedah itu.
    Dilarang ulang kaedah, ayat, urutan, atau bentuk hasil merentas set.
 4. aktiviti_masteri: kaedah Pembelajaran Masteri. Murid membuktikan kriteria objektif, bukan syarahan ulang.
-5. bbm dan nilai.
+5. bbm: senarai pendek nama bahan sahaja, dipisah koma. Jangan tulis ayat atau huraian. nilai: satu nilai murni.
 
 Kaedah yang dibenarkan:
 ${senaraiKaedah()}

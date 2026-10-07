@@ -1,5 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, PageSizes, rgb, StandardFonts } from "pdf-lib";
 import { HARI_LIST } from "@/lib/jadual/types";
+import { ringkasBbm } from "@/lib/rph/bbm";
 import { bacaStatusRefleksi, type RphRekod } from "./types";
 
 const MARGIN = 36;
@@ -300,7 +301,7 @@ function lukisSesi(
   const nilaiIsi = pelukis.lebar * 0.18;
   pelukis.barisSel([
     { teks: "BBM", lebar: labelW, biru: true, tebal: true },
-    { teks: isi(rekod.bbm), lebar: pelukis.lebar - labelW - nilaiLabel - nilaiIsi },
+    { teks: isi(ringkasBbm(rekod.bbm ?? "")), lebar: pelukis.lebar - labelW - nilaiLabel - nilaiIsi },
     { teks: "NILAI", lebar: nilaiLabel, biru: true, tebal: true, tengah: true },
     { teks: isi(rekod.nilai), lebar: nilaiIsi, tengah: true, tebal: true },
   ]);

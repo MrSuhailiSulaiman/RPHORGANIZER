@@ -1,3 +1,4 @@
+import { ringkasBbm } from "./bbm";
 import { bacaStatusRefleksi, STATUS_REFLEKSI_ASAL, type RphRekod, type RphStandard } from "./types";
 import type { SesiPdp } from "@/lib/jadual/types";
 
@@ -196,7 +197,7 @@ export function dariRekod(rekod: RphRekod): BorangRphNilai {
     sk_tajuk: rekod.sk_tajuk ?? "",
     standard_pembelajaran: standardSebenar(rekod.standard_pembelajaran),
     objektif: rekod.objektif.length ? rekod.objektif : ["", ""],
-    bbm: kosongkanBahan ? "" : (rekod.bbm ?? ""),
+    bbm: kosongkanBahan ? "" : ringkasBbm(rekod.bbm ?? ""),
     nilai: kosongkanBahan ? "" : (rekod.nilai ?? NILAI_ASAL),
     aktiviti: rekod.aktiviti.length ? rekod.aktiviti : ["", "", "", "", "", ""],
     refleksi_peratus: rekod.refleksi_peratus != null ? String(rekod.refleksi_peratus) : "",
@@ -217,5 +218,6 @@ export function muatanSimpan(borang: BorangRphNilai) {
     refleksi_berjaya: bacaStatusRefleksi(borang.refleksi_berjaya),
     refleksi_catatan: borang.refleksi_catatan,
     nilai: borang.nilai,
+    bbm: ringkasBbm(borang.bbm),
   };
 }
