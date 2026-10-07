@@ -12,7 +12,9 @@ import {
   borangKosong,
   dariRekod,
   muatAktivitiPeperiksaan,
+  muatUlangkaji,
   muatanSimpan,
+  standardSebenar,
   terapModRph,
   type BorangRphNilai,
   type ModRph,
@@ -113,7 +115,12 @@ export function BorangRph({
     }));
     if (janaTunda.current) clearTimeout(janaTunda.current);
     if (!next.length) return;
+    const mod = borangRujukan.current.mod;
     janaTunda.current = setTimeout(() => {
+      if (mod === "ulangkaji") {
+        void janaUlangkaji({ ...borangRujukan.current, standard_pembelajaran: next });
+        return;
+      }
       void janaSesi({ standard: next, skop: "objektif" });
     }, 500);
   }
@@ -202,12 +209,55 @@ export function BorangRph({
     }
   }
 
+  async function janaUlangkaji(asas: BorangRphNilai) {
+    if (!standardSebenar(asas.standard_pembelajaran).some((item) => item.pernyataan.trim())) {
+      toast.error("Pilih standard pembelajaran dahulu.");
+      return;
+    }
+    const masa = ++janaMasa.current;
+    setSedangJana(true);
+    try {
+      const json = await muatUlangkaji(asas);
+      if (masa !== janaMasa.current) return;
+      setBorang((current) =>
+        current.mod === "ulangkaji"
+          ? {
+              ...current,
+              objektif: json.objektif?.length ? json.objektif : current.objektif,
+              aktiviti: json.aktiviti?.length ? json.aktiviti : current.aktiviti,
+              bbm: json.bbm?.trim() ? json.bbm : current.bbm,
+            }
+          : current
+      );
+      if (json.sandaran) {
+        toast.warning(json.sebab ?? "Gemini tidak dapat dihubungi. Templat ulang kaji digunakan.");
+      } else {
+        toast.success("Objektif dan aktiviti ulang kaji dijana. Semak kemudian simpan.");
+      }
+    } catch (error) {
+      if (masa !== janaMasa.current) return;
+      toast.error(error instanceof Error ? error.message : "Gagal menjana ulang kaji.");
+    } finally {
+      if (masa === janaMasa.current) setSedangJana(false);
+    }
+  }
+
   function pilihMod(mod: Exclude<ModRph, "pdpc">) {
     if (janaTunda.current) clearTimeout(janaTunda.current);
     if (mod === "cuti") {
       janaMasa.current += 1;
       setSedangJana(false);
       setBorang((current) => terapModRph(current, "cuti"));
+      return;
+    }
+    if (mod === "ulangkaji") {
+      const seterusnya = terapModRph(borangRujukan.current, "ulangkaji");
+      setBorang(seterusnya);
+      if (!standardSebenar(seterusnya.standard_pembelajaran).some((item) => item.pernyataan.trim())) {
+        toast("Pilih standard kandungan dan standard pembelajaran. Objektif serta aktiviti akan dijana selepas itu.");
+        return;
+      }
+      void janaUlangkaji(seterusnya);
       return;
     }
     const seterusnya = terapModRph(borangRujukan.current, "peperiksaan");
@@ -222,6 +272,10 @@ export function BorangRph({
     }
     if (borangRujukan.current.mod === "peperiksaan") {
       void janaPeperiksaan(borangRujukan.current);
+      return;
+    }
+    if (borangRujukan.current.mod === "ulangkaji") {
+      void janaUlangkaji(borangRujukan.current);
       return;
     }
     const standard = (pilihan?.standard ?? borang.standard_pembelajaran).filter((item) =>
@@ -328,6 +382,14 @@ export function BorangRph({
             disabled={sedangJana}
           >
             Cuti
+          </Button>
+          <Button
+            type="button"
+            variant={borang.mod === "ulangkaji" ? "default" : "outline"}
+            onClick={() => pilihMod("ulangkaji")}
+            disabled={sedangJana}
+          >
+            Ulangkaji
           </Button>
           <Button type="button" onClick={() => void janaSesi()} disabled={sedangJana}>
             {sedangJana ? <Loader2 className="animate-spin" /> : <Sparkles />}

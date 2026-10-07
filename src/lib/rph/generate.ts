@@ -407,6 +407,120 @@ Setiap langkah 1-2 ayat: apa guru pengawas dan murid buat, dari persediaan dewan
   return aktiviti;
 }
 
+const aktivitiUlangkajiSchema = z.object({
+  aktiviti: z.array(z.string().min(30).max(500)).min(5).max(8),
+  bbm: z.string().min(3).max(300),
+});
+
+export function objektifUlangkajiSandaran(kodSp?: string) {
+  const rujukan = kodSp?.trim() || "standard yang dipilih";
+  return [
+    `Murid dapat menjawab 8 soalan topikal berkaitan ${rujukan} dengan sekurang-kurangnya 6 jawapan yang tepat dalam masa 20 minit.`,
+    `Murid dapat menyelesaikan 5 soalan percubaan negeri berkaitan ${rujukan} dan membetulkan sekurang-kurangnya 3 kesilapan selepas semakan jawapan.`,
+  ];
+}
+
+export function aktivitiUlangkajiSandaran(objektif: string[]) {
+  const fokus = objektif.map((item) => item.trim()).filter(Boolean)[0] || "objektif ulang kaji";
+  return [
+    `Murid membaca semula nota ringkas supaya bersedia mencapai objektif: ${fokus}`,
+    "Murid menjawab soalan topikal secara individu dalam masa yang ditetapkan tanpa merujuk nota.",
+    "Murid berpasangan menyemak jawapan soalan topikal dan membetulkan sekurang-kurangnya 2 kesilapan.",
+    "Murid menjawab soalan percubaan negeri yang sepadan dengan objektif ulang kaji.",
+    "Perwakilan menerangkan 2 kesilapan lazim dan cara jawapan yang menepati objektif.",
+    "Murid menyemak hasil sendiri supaya setiap jawapan selari dengan objektif ulang kaji.",
+  ];
+}
+
+export function bbmUlangkajiSandaran() {
+  return "Kertas soalan topikal, kertas soalan percubaan negeri, buku teks";
+}
+
+export async function janaKandunganUlangkaji(
+  input: KonteksSesi,
+  apiKey?: string
+): Promise<{ objektif: string[]; aktiviti: string[]; bbm: string; sandaran: boolean; sebab?: string }> {
+  const sp = input.standard_pembelajaran.filter((item) => item.pernyataan.trim());
+  if (!sp.length) throw new Error("Pilih standard pembelajaran dahulu.");
+  const kod = sp.map((item) => item.kod).filter(Boolean).join(", ");
+  if (!(apiKey || hasGeminiKey())) {
+    const objektif = objektifUlangkajiSandaran(kod || sp[0]?.pernyataan);
+    return {
+      objektif,
+      aktiviti: aktivitiUlangkajiSandaran(objektif),
+      bbm: bbmUlangkajiSandaran(),
+      sandaran: true,
+    };
+  }
+
+  let objektif: string[] | null = null;
+  let sebabObjektif = "";
+  try {
+    const output = await janaObjek(
+      objektifSahajaSchema,
+      `${promptKonteksSesi(input, sp)}
+
+Ini sesi ULANG KAJI, bukan pengajaran baharu.
+Hasilkan 2 atau 3 objektif ulang kaji yang boleh diukur.
+Setiap objektif mesti menyebut kod Standard Pembelajaran dalam frasa "berkaitan {kod}".
+Fokus pada perkara murid perlu kuasai semula: menjawab soalan, membetulkan kesilapan, atau mengingat isi penting.
+Jangan salin ayat standard pembelajaran.`,
+      apiKey
+    );
+    if (!output?.objektif?.length) throw new Error("Gemini tidak menghasilkan objektif ulang kaji.");
+    objektif = pastikanKodDalamObjektif(output.objektif, sp);
+  } catch (error) {
+    sebabObjektif = error instanceof Error ? error.message : "Gemini gagal menjana objektif ulang kaji.";
+    objektif = objektifUlangkajiSandaran(kod || sp[0]?.pernyataan);
+  }
+
+  try {
+    const output = await janaObjek(
+      aktivitiUlangkajiSchema,
+      `Anda guru KSSM Malaysia. Tulis dalam bahasa Melayu standard sekolah.
+Ini sesi ULANG KAJI. Jangan tulis pengajaran topik baharu.
+
+Mata pelajaran: ${input.mata_pelajaran || "-"}
+Tingkatan: ${input.tingkatan || "-"}
+Kelas: ${input.kelas || "-"}
+Masa: ${input.masa || "-"}
+Standard kandungan: ${[input.sk_kod, input.sk_tajuk].filter(Boolean).join(" ") || "-"}
+
+Objektif yang mesti dicapai:
+${objektif.map((item, indeks) => `${indeks + 1}. ${item}`).join("\n")}
+
+Tulis 5 hingga 8 langkah aktiviti ulang kaji yang melaksanakan objektif di atas.
+Pilih bentuk yang sesuai dengan objektif, contohnya:
+- menjawab soalan topikal
+- menjawab soalan percubaan negeri
+- aktiviti ulang kaji lain yang benar-benar membantu murid mencapai objektif itu
+
+Setiap langkah 1-2 ayat: apa murid buat, bahan yang digunakan, dan bagaimana hasilnya disemak terhadap objektif.
+Jangan ulang ayat objektif sebagai aktiviti.
+bbm: senaraikan bahan ulang kaji yang digunakan, seperti kertas soalan topikal atau kertas percubaan negeri.`,
+      apiKey
+    );
+    const aktiviti = bersihAktiviti(output?.aktiviti);
+    if (aktiviti.length < 5) throw new Error("Gemini tidak menghasilkan aktiviti ulang kaji.");
+    return {
+      objektif,
+      aktiviti,
+      bbm: output?.bbm.trim() || bbmUlangkajiSandaran(),
+      sandaran: Boolean(sebabObjektif),
+      sebab: sebabObjektif || undefined,
+    };
+  } catch (error) {
+    const sebabAktiviti = error instanceof Error ? error.message : "Gemini gagal menjana aktiviti ulang kaji.";
+    return {
+      objektif,
+      aktiviti: aktivitiUlangkajiSandaran(objektif),
+      bbm: bbmUlangkajiSandaran(),
+      sandaran: true,
+      sebab: sebabObjektif || sebabAktiviti,
+    };
+  }
+}
+
 export async function janaObjektifSesi(input: KonteksSesi, apiKey?: string): Promise<string[]> {
   const sp = tapisSp(input, apiKey);
   const output = await janaObjek(

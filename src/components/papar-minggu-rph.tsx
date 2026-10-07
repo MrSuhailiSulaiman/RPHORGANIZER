@@ -9,10 +9,10 @@ import { ButangKongsiRph } from "@/components/butang-kongsi-rph";
 import { Button } from "@/components/ui/button";
 import { JadualRph } from "@/components/jadual-rph";
 import { TapisMingguRph } from "@/components/tapis-minggu-rph";
-import { dariRekod, muatAktivitiPeperiksaan, muatanSimpan, terapModRph, type BorangRphNilai } from "@/lib/rph/borang";
+import { dariRekod, muatAktivitiPeperiksaan, muatUlangkaji, muatanSimpan, standardSebenar, terapModRph, type BorangRphNilai } from "@/lib/rph/borang";
 import { muatTurunPdfMinggu } from "@/lib/rph/muat-pdf";
 import { bandingSesiRph, kumpulanMingguRph, type KumpulanMingguRph } from "@/lib/rph/tahun";
-import type { RphRekod } from "@/lib/rph/types";
+import type { RphRekod, RphStandard } from "@/lib/rph/types";
 
 export function PaparMingguRph() {
   const router = useRouter();
@@ -30,6 +30,7 @@ export function PaparMingguRph() {
   const [sedangPdf, setSedangPdf] = useState(false);
   const [sedangJana, setSedangJana] = useState<number | null>(null);
   const janaToken = useRef<number[]>([]);
+  const tundaUlang = useRef<Array<ReturnType<typeof setTimeout> | null>>([]);
   const borangRujukan = useRef(borang);
   borangRujukan.current = borang;
 
@@ -79,15 +80,75 @@ export function PaparMingguRph() {
     setBorang((senarai) => senarai.map((item, i) => (i === indeks ? nilai : item)));
   }
 
-  async function pilihMod(indeks: number, mod: "peperiksaan" | "cuti") {
+  async function janaUlangkaji(indeks: number, asas: BorangRphNilai) {
+    if (!standardSebenar(asas.standard_pembelajaran).some((item) => item.pernyataan.trim())) {
+      toast.error("Pilih standard pembelajaran dahulu.");
+      return;
+    }
+    const token = (janaToken.current[indeks] ?? 0) + 1;
+    janaToken.current[indeks] = token;
+    setSedangJana(indeks);
+    try {
+      const json = await muatUlangkaji(asas);
+      if (janaToken.current[indeks] !== token) return;
+      setBorang((senarai) =>
+        senarai.map((item, i) =>
+          i === indeks && item.mod === "ulangkaji"
+            ? {
+                ...item,
+                objektif: json.objektif?.length ? json.objektif : item.objektif,
+                aktiviti: json.aktiviti?.length ? json.aktiviti : item.aktiviti,
+                bbm: json.bbm?.trim() ? json.bbm : item.bbm,
+              }
+            : item
+        )
+      );
+      if (json.sandaran) {
+        toast.warning(json.sebab ?? "Gemini tidak dapat dihubungi. Templat ulang kaji digunakan.");
+      } else {
+        toast.success(`Objektif dan aktiviti ulang kaji dijana untuk sesi ${indeks + 1}.`);
+      }
+    } catch (error) {
+      if (janaToken.current[indeks] !== token) return;
+      toast.error(error instanceof Error ? error.message : "Gagal menjana ulang kaji.");
+    } finally {
+      if (janaToken.current[indeks] === token) setSedangJana((nilai) => (nilai === indeks ? null : nilai));
+    }
+  }
+
+  function togolSp(indeks: number, sp: RphStandard, checked: boolean) {
     const semasa = borangRujukan.current[indeks];
     if (!semasa) return;
+    const next = checked
+      ? [...semasa.standard_pembelajaran.filter((item) => item.kod !== sp.kod), sp]
+      : semasa.standard_pembelajaran.filter((item) => item.kod !== sp.kod);
+    const seterusnya = { ...semasa, standard_pembelajaran: next };
+    kemaskini(indeks, seterusnya);
+    if (tundaUlang.current[indeks]) clearTimeout(tundaUlang.current[indeks]!);
+    if (seterusnya.mod !== "ulangkaji" || !next.some((item) => item.pernyataan.trim())) return;
+    tundaUlang.current[indeks] = setTimeout(() => {
+      void janaUlangkaji(indeks, seterusnya);
+    }, 500);
+  }
+
+  async function pilihMod(indeks: number, mod: "peperiksaan" | "cuti" | "ulangkaji") {
+    const semasa = borangRujukan.current[indeks];
+    if (!semasa) return;
+    if (tundaUlang.current[indeks]) clearTimeout(tundaUlang.current[indeks]!);
     const token = (janaToken.current[indeks] ?? 0) + 1;
     janaToken.current[indeks] = token;
     const asas = terapModRph(semasa, mod);
     kemaskini(indeks, asas);
     if (mod === "cuti") {
       setSedangJana((nilai) => (nilai === indeks ? null : nilai));
+      return;
+    }
+    if (mod === "ulangkaji") {
+      if (!standardSebenar(asas.standard_pembelajaran).some((item) => item.pernyataan.trim())) {
+        toast("Pilih standard kandungan dan standard pembelajaran. Objektif serta aktiviti akan dijana selepas itu.");
+        return;
+      }
+      void janaUlangkaji(indeks, asas);
       return;
     }
     setSedangJana(indeks);
@@ -256,12 +317,22 @@ export function PaparMingguRph() {
                 >
                   Cuti
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={item.mod === "ulangkaji" ? "default" : "outline"}
+                  disabled={sedangJana === indeks}
+                  onClick={() => void pilihMod(indeks, "ulangkaji")}
+                >
+                  Ulangkaji
+                </Button>
               </div>
             </div>
             <JadualRph
               borang={item}
               sedangJana={sedangJana === indeks}
               onChange={(nilai) => kemaskini(indeks, nilai)}
+              onTogolSp={(sp, checked) => togolSp(indeks, sp, checked)}
             />
           </section>
         ))

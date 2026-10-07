@@ -155,7 +155,13 @@ export function JadualRph({
 
   useEffect(() => {
     if (bacaSahaja) return;
-    if (borangRujukan.current.mod === "peperiksaan" || borangRujukan.current.mod === "cuti") return;
+    if (
+      borangRujukan.current.mod === "peperiksaan" ||
+      borangRujukan.current.mod === "cuti" ||
+      borangRujukan.current.mod === "ulangkaji"
+    ) {
+      return;
+    }
     const senarai = kurikulum?.bidang ?? [];
     if (!senarai.length) return;
     const current = borangRujukan.current;
@@ -218,7 +224,7 @@ export function JadualRph({
   function pilihBidang(kod: string) {
     const item = bidang.find((row) => samaKod(row.kod, kod));
     kemaskini({
-      mod: "pdpc",
+      mod: borang.mod === "ulangkaji" ? "ulangkaji" : "pdpc",
       bidang_kod: kod,
       bidang_nama: item ? gabungKodTajuk(item.kod, item.nama) : borang.bidang_nama,
       sk_kod: "",
@@ -230,7 +236,7 @@ export function JadualRph({
   function pilihSk(kod: string) {
     const item = skList.find((row) => samaKod(row.kod, kod));
     kemaskini({
-      mod: "pdpc",
+      mod: borang.mod === "ulangkaji" ? "ulangkaji" : "pdpc",
       sk_kod: item?.kod || kod,
       sk_tajuk: item ? gabungKodTajuk(item.kod, item.tajuk) : borang.sk_tajuk,
       standard_pembelajaran: [],
@@ -413,6 +419,12 @@ export function JadualRph({
           <tr>
             <th className={labelCell}>Standard pembelajaran</th>
             <td className={`${cell} space-y-2`} colSpan={5}>
+              {borang.mod === "ulangkaji" && !bacaSahaja ? (
+                <p className="text-xs text-slate-500">
+                  Pilih standard sendiri. Objektif dan aktiviti ulang kaji dijana oleh Gemini berdasarkan
+                  standard ini.
+                </p>
+              ) : null}
               {bacaSahaja ? (
                 borang.standard_pembelajaran.length ? (
                   <ul className="space-y-1">
@@ -478,7 +490,9 @@ export function JadualRph({
                   <Loader2 className="size-3 animate-spin" />
                   {borang.mod === "peperiksaan"
                     ? "Gemini sedang menulis aktiviti pengawasan peperiksaan..."
-                    : "Gemini sedang menganalisis standard pembelajaran..."}
+                    : borang.mod === "ulangkaji"
+                      ? "Gemini sedang menulis objektif dan aktiviti ulang kaji..."
+                      : "Gemini sedang menganalisis standard pembelajaran..."}
                 </p>
               ) : null}
               {borang.mod === "cuti" && !borang.objektif.length ? (

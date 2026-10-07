@@ -284,6 +284,7 @@ function lukisSesi(
   pelukis.barisLabel(
     "STANDARD PEMBELAJARAN",
     rekod.standard_pembelajaran
+      .filter((item) => !(item.kod === "ULANGKAJI" && !item.pernyataan.trim()))
       .map((item) => {
         const ayat = `${item.kod} ${item.pernyataan}`.trim();
         const butiran = (item.butiran ?? []).filter((baris) => baris.trim());
