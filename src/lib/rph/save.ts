@@ -253,16 +253,15 @@ export async function getKurikulum(
     .order("created_at", { ascending: false });
 
   if (mataPelajaran.trim()) {
-    query = query.ilike("mata_pelajaran", `%${mataPelajaran.trim()}%`);
+    query = query.ilike("mata_pelajaran", mataPelajaran.trim());
   }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  const tahap = tingkatan.replace(/tingkatan/i, "").trim();
-  const dokumen =
-    (data ?? []).find((row) => {
-      const nilai = String(row.tingkatan ?? "");
-      return !tahap || nilai.includes(tahap);
-    }) ?? data?.[0];
+  const tahap = tingkatan.match(/[1-6]/)?.[0] ?? "";
+  const dokumen = (data ?? []).find((row) => {
+    if (!tahap) return true;
+    return (String(row.tingkatan ?? "").match(/[1-6]/)?.[0] ?? "") === tahap;
+  });
   if (!dokumen) return null;
 
   const bidang = gabungBidangSama(
